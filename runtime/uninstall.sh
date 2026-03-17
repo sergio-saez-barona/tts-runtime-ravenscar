@@ -1,5 +1,7 @@
 #! /bin/bash
 
+GNARL_USER=arm-eabi/lib/gnat/embedded-stm32f4/gnarl_user
+
 INSTALLDIR=$(dirname $(dirname $(which arm-eabi-gcc)))
 
 if [ ! -d $INSTALLDIR ] ; then
@@ -10,7 +12,7 @@ else
     echo "GNAT directory: $INSTALLDIR";
 fi
 
-SRCDIR=${INSTALLDIR}/arm-eabi/include/rts-sources
+SRCDIR=${INSTALLDIR}/$GNARL_USER
 
 FILES=$(cat files.txt)
 
@@ -25,9 +27,5 @@ do
     f=${SRCDIR}/$i
     
     rm -vf ${f}
-
-    if [ -f ${f}.org ] ; then
-	mv -v ${f}.org ${f}
-    fi
 done
 

@@ -1,5 +1,7 @@
 #! /bin/bash
 
+GNARL_USER=arm-eabi/lib/gnat/embedded-stm32f4/gnarl_user
+
 BINFILE=$(which arm-eabi-gcc)
 if [ -z "$BINFILE" ] ; then
     echo "Maybe GNAT environment is not properly established"
@@ -16,7 +18,7 @@ else
     echo "GNAT directory: $INSTALLDIR";
 fi
 
-SRCDIR=${INSTALLDIR}/arm-eabi/include/rts-sources
+SRCDIR=${INSTALLDIR}/$GNARL_USER
 
 if [ ! -f files.txt ] ; then
     echo "No installation file 'files.txt' found"
@@ -35,42 +37,11 @@ do
     
     f=${SRCDIR}/$i
     if [ -f $f ] ; then
-	if [ ! -f ${f}.org ] ; then
-	    cp -v ${f} ${f}.org
-	else
-	    echo "File '${f}' already backed up"
-	fi
+	echo "File '${b}' already installed"
+    else
+	echo cp -v $b $f
     fi
 
-    cp -v $b $f
 done
 
-SRCDIR=${INSTALLDIR}/arm-eabi/BSPs/cortex-m/armv7-m/src
-
-if [ ! -f bsp-files.txt ] ; then
-    echo "No installation file 'bsp-files.txt' found"
-    exit 1
-fi
-
-FILES=$(cat bsp-files.txt)
-
-for i in $FILES
-do
-    b=$(basename $i)
-
-    if [ ! -f $b ] ; then
-	continue
-    fi
-    
-    f=${SRCDIR}/$i
-    if [ -f $f ] ; then
-	if [ ! -f ${f}.org ] ; then
-	    cp -v ${f} ${f}.org
-	else
-	    echo "File '${f}' already backed up"
-	fi
-    fi
-
-    cp -v $b $f
-done
 
