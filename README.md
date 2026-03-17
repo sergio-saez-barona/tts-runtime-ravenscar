@@ -68,6 +68,11 @@ The main contributions of this work are summarised below:
   to event-triggered activities.
 
 
+Version v0.4.1: <a href="https://doi.org/10.5281/zenodo.19065847"><img
+src="https://zenodo.org/badge/DOI/10.5281/zenodo.19065847.svg"
+alt="DOI"></a>
+
+
 ## Version v0.3.0.
 
 This is the version cited from paper "A Hierarchical Architecture for Time- and Event-Triggered Real-Time Systems"
