@@ -39,7 +39,7 @@ do
     if [ -f $f ] ; then
 	echo "File '${b}' already installed"
     else
-	echo cp -v $b $f
+	cp -v $b $f
     fi
 
 done

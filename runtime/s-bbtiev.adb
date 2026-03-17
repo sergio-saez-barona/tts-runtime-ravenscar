@@ -42,34 +42,32 @@ package body System.BB.Timing_Events is
    --  One event list for each CPU
 
    procedure Insert
-     (Event : not null Timing_Event_Access; Is_First : out Boolean)
-   with
-     --  Insert an event in the event list of the current CPU (Timeout order
-     --  then FIFO). Is_First is set to True when Event becomes the next timing
-     --  event to serve, False otherwise.
+     (Event    : not null Timing_Event_Access;
+      Is_First : out Boolean) with
+   --  Insert an event in the event list of the current CPU (Timeout order
+   --  then FIFO). Is_First is set to True when Event becomes the next timing
+   --  event to serve, False otherwise.
 
-     Pre  =>
+     Pre =>
 
        --  The first element in the list (if it exists) cannot have a previous
        --  element.
 
-        (if Events_Table (Current_CPU) /= null
-         then Events_Table (Current_CPU).Prev = null)
+       (if Events_Table (Current_CPU) /= null then
+         Events_Table (Current_CPU).Prev = null)
 
-       --  The event should be set
+         --  The event should be set
 
-       and then Event.Handler /= null
+         and then Event.Handler /= null
 
-       --  The event should not be already inserted in a list
+         --  The event should not be already inserted in a list
 
-       and then Event.Next = null
-       and then Event.Prev = null
+         and then Event.Next = null and then Event.Prev = null
 
-       --  Timing Events must always be handled by the same CPU
+         --  Timing Events must always be handled by the same CPU
 
-       and then
-         (not System.BB.Parameters.Multiprocessor
-          or else Event.CPU = Current_CPU),
+         and then (not System.BB.Parameters.Multiprocessor
+                    or else Event.CPU = Current_CPU),
 
      Post =>
 
@@ -77,90 +75,85 @@ package body System.BB.Timing_Events is
        --  serve (because the list was empty or the list contained only events
        --  with a later expiration time).
 
-        (if Events_Table (Current_CPU) = Event
-         then
+       (if Events_Table (Current_CPU) = Event then
            Is_First
-           and then Event.all.Prev = null
-           and then Event.all.Next = Events_Table'Old (Current_CPU)
+             and then Event.all.Prev = null
+             and then Event.all.Next = Events_Table'Old (Current_CPU)
 
-         --  If the event is not first then the head of queue does not change
+        --  If the event is not first then the head of queue does not change
 
-         else
+        else
            Events_Table (Current_CPU) = Events_Table'Old (Current_CPU)
-           and then Event.all.Prev /= null)
+             and then Event.all.Prev /= null)
 
-       --  The queue cannot be empty after insertion
+         --  The queue cannot be empty after insertion
 
-       and then Events_Table (Current_CPU) /= null
+         and then Events_Table (Current_CPU) /= null
 
-       --  The first element in the list can never have a previous element
+         --  The first element in the list can never have a previous element
 
-       and then Events_Table (Current_CPU).Prev = null
+         and then Events_Table (Current_CPU).Prev = null
 
-       --  The queue is always ordered by expiration time and then FIFO
+         --  The queue is always ordered by expiration time and then FIFO
 
-       and then
-         (Event.all.Next = null or else Event.all.Next.Timeout > Event.Timeout)
-       and then
-         (Event.all.Prev = null
-          or else Event.all.Prev.Timeout <= Event.Timeout);
+         and then (Event.all.Next = null
+                    or else Event.all.Next.Timeout > Event.Timeout)
+         and then (Event.all.Prev = null
+                    or else Event.all.Prev.Timeout <= Event.Timeout);
 
-   procedure Extract
-     (Event : not null Timing_Event_Access; Was_First : out Boolean)
-   with
-     --  Extract an event from the event list of the current CPU. Was_First is
-     --  True when we extract the event that was first in the queue, else False.
+   procedure Extract (Event     : not null Timing_Event_Access;
+                      Was_First : out Boolean) with
+   --  Extract an event from the event list of the current CPU. Was_First is
+   --  True when we extract the event that was first in the queue, else False.
 
-     Pre  =>
+     Pre =>
 
        --  There must be at least one element in the queue
 
-         Events_Table (Current_CPU)
-       /= null
+       Events_Table (Current_CPU) /= null
 
-       --  The first element in the list can never have a previous element
+         --  The first element in the list can never have a previous element
 
-       and then Events_Table (Current_CPU).Prev = null
+         and then Events_Table (Current_CPU).Prev = null
 
-       --  The first element has Prev equal to null, but the others have Prev
-       --  pointing to another timing event.
+         --  The first element has Prev equal to null, but the others have Prev
+         --  pointing to another timing event.
 
-       and then
-         (if Event /= Events_Table (Current_CPU) then Event.Prev /= null)
+         and then (if Event /= Events_Table (Current_CPU) then
+                     Event.Prev /= null)
 
-       --  The queue is always ordered by expiration time and then FIFO
+         --  The queue is always ordered by expiration time and then FIFO
 
-       and then (Event.Next = null or else Event.Next.Timeout >= Event.Timeout)
-       and then (Event.Prev = null or else Event.Prev.Timeout <= Event.Timeout)
+         and then (Event.Next = null
+                    or else Event.Next.Timeout >= Event.Timeout)
+         and then (Event.Prev = null
+                    or else Event.Prev.Timeout <= Event.Timeout)
 
-       --  Timing Events must always be handled by the same CPU
+         --  Timing Events must always be handled by the same CPU
 
-       and then
-         (not System.BB.Parameters.Multiprocessor
-          or else Event.CPU = Current_CPU),
+         and then (not System.BB.Parameters.Multiprocessor
+                    or else Event.CPU = Current_CPU),
 
      Post =>
 
        --  Was_First is set to True when we extract the event that was first
        --  in the queue.
 
-        (if Events_Table'Old (Current_CPU) = Event
-         then
-           Events_Table (Current_CPU) /= Events_Table'Old (Current_CPU)
-           and then Was_First)
+       (if Events_Table'Old (Current_CPU) = Event then
+          Events_Table (Current_CPU) /= Events_Table'Old (Current_CPU)
+            and then Was_First)
 
-       --  The first element in the list (if it exists) cannot have a
-       --  previous element.
+         --  The first element in the list (if it exists) cannot have a
+         --  previous element.
 
-       and then
-         (if Events_Table (Current_CPU) /= null
-          then Events_Table (Current_CPU).Prev = null)
+         and then (if Events_Table (Current_CPU) /= null then
+                     Events_Table (Current_CPU).Prev = null)
 
-       --  The Prev and Next pointers are set to null to indicate that the
-       --  event is no longer in the list.
+         --  The Prev and Next pointers are set to null to indicate that the
+         --  event is no longer in the list.
 
-       and then Event.all.Prev = null
-       and then Event.all.Next = null;
+         and then Event.all.Prev = null
+         and then Event.all.Next = null;
 
    -----------------
    -- Set_Handler --
@@ -172,9 +165,9 @@ package body System.BB.Timing_Events is
       Handler : Timing_Event_Handler)
    is
       Next_Alarm : System.BB.Time.Time;
-      CPU_Id     : constant CPU := Current_CPU;
-      Was_First  : Boolean := False;
-      Is_First   : Boolean := False;
+      CPU_Id     : constant CPU        := Current_CPU;
+      Was_First  : Boolean             := False;
+      Is_First   : Boolean             := False;
 
    begin
       if Event.Handler /= null then
@@ -191,7 +184,7 @@ package body System.BB.Timing_Events is
          --  Update event fields
 
          Event.Timeout := At_Time;
-         Event.CPU := CPU_Id;
+         Event.CPU     := CPU_Id;
 
          --  Insert event in the list
 
@@ -210,28 +203,22 @@ package body System.BB.Timing_Events is
       --  status of the timing event handler may change (if may expire, for
       --  example).
 
-      pragma
-        Assert
-          ((if Handler = null
-            then
+      pragma Assert
+        ((if Handler = null then
 
-              --  If Handler is null the event is cleared
+             --  If Handler is null the event is cleared
 
-                Event
-                .Handler
-              = null
+             Event.Handler = null
 
-            else
-              --  If Handler is not null then the timing event handler is set,
-              --  and the execution time for the event is set to At_Time in the
-              --  current CPU. Next timeout events can never be later than the
-              --  event that we have just inserted.
+          else
+             --  If Handler is not null then the timing event handler is set,
+             --  and the execution time for the event is set to At_Time in the
+             --  current CPU. Next timeout events can never be later than the
+             --  event that we have just inserted.
 
-                Event
-                .Handler
-              = Handler
-              and then Event.Timeout = At_Time
-              and then Time.Get_Next_Timeout (CPU_Id) <= At_Time));
+             Event.Handler = Handler
+               and then Event.Timeout = At_Time
+               and then Time.Get_Next_Timeout (CPU_Id) <= At_Time));
    end Set_Handler;
 
    --------------------
@@ -239,7 +226,8 @@ package body System.BB.Timing_Events is
    --------------------
 
    procedure Cancel_Handler
-     (Event : in out Timing_Event; Cancelled : out Boolean)
+     (Event     : in out Timing_Event;
+      Cancelled : out Boolean)
    is
       Next_Alarm : System.BB.Time.Time;
       CPU_Id     : constant CPU := Current_CPU;
@@ -252,7 +240,7 @@ package body System.BB.Timing_Events is
 
          Extract (Event'Unchecked_Access, Was_First);
 
-         Cancelled := True;
+         Cancelled     := True;
          Event.Handler := null;
 
          if Was_First then
@@ -333,10 +321,8 @@ package body System.BB.Timing_Events is
 
       --  No more events to handle with an expiration time before Now
 
-      pragma
-        Assert
-          (Events_Table (CPU_Id) = null
-           or else Events_Table (CPU_Id).Timeout > Now);
+      pragma Assert (Events_Table (CPU_Id) = null
+                       or else Events_Table (CPU_Id).Timeout > Now);
    end Execute_Expired_Timing_Events;
 
    ----------------------
@@ -362,8 +348,7 @@ package body System.BB.Timing_Events is
    function Time_Of_Event (Event : Timing_Event) return System.BB.Time.Time is
    begin
       if Event.Handler = null then
-         ---  During event handler execution
-         return Event.Time_Of_Handling;
+         return System.BB.Time.Time'First;
       else
          return Event.Timeout;
       end if;
@@ -373,8 +358,8 @@ package body System.BB.Timing_Events is
    -- Extract --
    -------------
 
-   procedure Extract
-     (Event : not null Timing_Event_Access; Was_First : out Boolean)
+   procedure Extract (Event     : not null Timing_Event_Access;
+                      Was_First : out Boolean)
    is
       CPU_Id : constant CPU := Current_CPU;
 
@@ -407,7 +392,8 @@ package body System.BB.Timing_Events is
    -------------
 
    procedure Insert
-     (Event : not null Timing_Event_Access; Is_First : out Boolean)
+     (Event    : not null Timing_Event_Access;
+      Is_First : out Boolean)
    is
       CPU_Id      : constant CPU := Current_CPU;
       Aux_Pointer : Timing_Event_Access;
