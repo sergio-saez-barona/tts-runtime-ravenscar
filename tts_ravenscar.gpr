@@ -4,15 +4,15 @@ project Tts_Ravenscar is
    for Target use "arm-eabi";
    for Object_Dir use "obj";
    for Source_Dirs use ("examples", "utilities", "extensions");
-   for Runtime ("ada") use "ravenscar-full-stm32f4";
-   for Main use ("main_a.adb", "main_b.adb");
+   for Runtime ("ada") use "embedded-stm32f4";
+   for Main use ("main_a.adb", "main_b.adb", "main_c.adb", "main_d.adb");
 
    package Compiler is
       for Switches ("ada") use ("-gnat12");
    end Compiler;
 
    package Ide is
-      for Vcs_Kind use "['Auto', 'Mercurial', 'Subversion', 'Git', 'ClearCase Native', 'CVS']";
+      for Vcs_Kind use "git";
       for Connection_Tool use "st-util";
       for Program_Host use "localhost:4242";
       for Communication_Protocol use "remote";

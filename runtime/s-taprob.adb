@@ -6,7 +6,7 @@
 --                                                                          --
 --                                  B o d y                                 --
 --                                                                          --
---          Copyright (C) 1992-2018, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2022, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNARL is free software; you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -15,9 +15,9 @@
 -- OUT ANY WARRANTY;  without even the  implied warranty of MERCHANTABILITY --
 -- or FITNESS FOR A PARTICULAR PURPOSE.                                     --
 --                                                                          --
---                                                                          --
---                                                                          --
---                                                                          --
+-- As a special exception under Section 7 of GPL version 3, you are granted --
+-- additional permissions described in the GCC Runtime Library Exception,   --
+-- version 3.1, as published by the Free Software Foundation.               --
 --                                                                          --
 -- You should have received a copy of the GNU General Public License and    --
 -- a copy of the GCC Runtime Library Exception along with this program;     --
@@ -37,14 +37,19 @@ with System.Task_Primitives.Operations;
 --           Self
 
 with System.BB.Threads;
+with System.BB.Timing_Events;
 with System.TTS_Support;
+
+with System.BB.Protection;
 
 package body System.Tasking.Protected_Objects is
 
    use System.Task_Primitives.Operations;
    use System.Multiprocessors;
+
    use System.BB.Threads;
    use System.TTS_Support;
+   use System.BB.Timing_Events;
 
    Multiprocessor : constant Boolean := CPU'Range_Length /= 1;
    --  Set true if on multiprocessor (more than one CPU)
@@ -168,6 +173,15 @@ package body System.Tasking.Protected_Objects is
          --  Only for multiprocessor
 
          Multiprocessors.Fair_Locks.Unlock (Object.Lock);
+      end if;
+
+      if T_Id.Timing_Events_Pending and then
+        Self_Id.Common.Protected_Action_Nesting = 0
+      then
+         System.BB.Protection.Enter_Kernel;
+         Execute_Expired_Timing_Events (T_Id.Timing_Events_Triggered);
+         System.BB.Protection.Leave_Kernel;
+         T_Id.Timing_Events_Pending := False;
       end if;
 
       if T_Id.Hold_Signaled and then

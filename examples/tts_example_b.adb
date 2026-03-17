@@ -7,7 +7,7 @@ with Epoch_Support; use Epoch_Support;
 with XAda.Dispatching.TTS;
 with TT_Utilities;
 with TT_Patterns;
-
+with TT_Mixed_Criticality;
 
 package body TTS_Example_B is
 
@@ -15,7 +15,7 @@ package body TTS_Example_B is
    Number_Of_Sync_Ids : constant := 6;
 
    package TTS is new XAda.Dispatching.TTS
-     (Number_Of_Work_Ids, Number_Of_Sync_Ids, Priority'Last - 1);
+     (TT_Mixed_Criticality.No_Criticality_Levels, Number_Of_Work_Ids, Number_Of_Sync_Ids, Priority'Last - 1);
 
    package TT_Util is new TT_Utilities (TTS);
    use TT_Util;
@@ -50,6 +50,7 @@ package body TTS_Example_B is
    procedure Initialize (S : in out TT_Task_State) is null;
    procedure Main_Code (S : in out TT_Task_State);
    type Any_TT_Task_State is access all TT_Task_State;
+   
    
    type Cont_Task_State is new Simple_Task_State with
       record

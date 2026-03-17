@@ -8,7 +8,7 @@
 --                                                                          --
 --        Copyright (C) 1999-2002 Universidad Politecnica de Madrid         --
 --             Copyright (C) 2003-2005 The European Space Agency            --
---                     Copyright (C) 2003-2018, AdaCore                     --
+--                     Copyright (C) 2003-2022, AdaCore                     --
 --                                                                          --
 -- GNARL is free software; you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -17,9 +17,9 @@
 -- OUT ANY WARRANTY;  without even the  implied warranty of MERCHANTABILITY --
 -- or FITNESS FOR A PARTICULAR PURPOSE.                                     --
 --                                                                          --
---                                                                          --
---                                                                          --
---                                                                          --
+-- As a special exception under Section 7 of GPL version 3, you are granted --
+-- additional permissions described in the GCC Runtime Library Exception,   --
+-- version 3.1, as published by the Free Software Foundation.               --
 --                                                                          --
 -- You should have received a copy of the GNU General Public License and    --
 -- a copy of the GCC Runtime Library Exception along with this program;     --
@@ -38,7 +38,6 @@
 
 pragma Restrictions (No_Elaboration_Code);
 
-with System;
 with System.Storage_Elements;
 with System.BB.CPU_Primitives;
 with System.BB.Time;
@@ -137,6 +136,13 @@ package System.BB.Threads is
       --  Variable which reflects whether a Hold action has been performed
       --  on the thread while it was in a protected action.
 
+      Timing_Events_Pending : Boolean;
+      --  Variable which reflects whether the execution of TE has been delayed
+      --  since this thread was in a protected action.
+
+      Timing_Events_Triggered : System.BB.Time.Time;
+      --  When the TE were trigerred
+
       Global_List : Thread_Id;
       --  Next thread in the global list. The queue is ordered by creation
       --  time. The first place is occupied by the environment thread, and
@@ -203,10 +209,9 @@ package System.BB.Threads is
       Idle_Priority : Integer;
       Stack_Address : System.Address;
       Stack_Size    : System.Storage_Elements.Storage_Offset) with
-   --  Procedure to initialize the idle thread on a slave CPU.
-   --  This thread is used to handle interrupt if the CPU doesn't have any
-   --  other task. The initialization for the main CPU must have been
-   --  performed. The operations to perform are:
+   --  Procedure to initialize the idle thread on a slave CPU. The
+   --  initialization for the main CPU must have been performed. The
+   --  operations to perform are:
    --    - Initialize the thread descriptor
    --       * Set base CPU to the one on which this code executes
    --       * Set the base and active priority
