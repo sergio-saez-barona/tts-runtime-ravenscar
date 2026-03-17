@@ -1,7 +1,7 @@
 # TTS-Runtime-Ravenscar
 Ravenscar implementation at the runtime level of a Time-Triggered scheduler.
 
-## Version 0.4
+## Version 0.4.1
 
 This version extends the framework with support for **mixed-criticality systems
 (MCS)**, while preserving its ability to combine **time-triggered and event-triggered
@@ -67,7 +67,6 @@ The main contributions of this work are summarised below:
   - **overrun management**  
   to event-triggered activities.
 
-Version v0.4.0: <a href="https://doi.org/10.5281/zenodo.19064209"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.19064209.svg" alt="DOI"></a>
 
 ## Version v0.3.0.
 
