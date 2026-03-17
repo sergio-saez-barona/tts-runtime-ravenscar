@@ -21,10 +21,11 @@ generic
    type Criticality_Levels is (<>);
    Number_Of_Work_IDs : Positive;
    Number_Of_Sync_IDs : Positive := 1;
-   TT_Priority        : System.Priority := System.Priority'Last;
-   Debug              : Boolean := False;
+   TT_Priority : System.Priority := System.Priority'Last;
+   Debug : Boolean := False;
 
-package XAda.Dispatching.TTS is
+package XAda.Dispatching.TTS
+is
 
    ---------------------
    --  Slot id types  --
@@ -48,8 +49,8 @@ package XAda.Dispatching.TTS is
       Criticality_Level : Criticality_Levels := Criticality_Levels'First;
    end record;
 
-   function Slot_Duration (S: in Time_Slot)
-     return Ada.Real_Time.Time_Span is (S.Slot_Size);
+   function Slot_Duration (S : in Time_Slot) return Ada.Real_Time.Time_Span
+   is (S.Slot_Size);
 
    type Any_Time_Slot is access all Time_Slot'Class;
 
@@ -65,42 +66,45 @@ package XAda.Dispatching.TTS is
    No_Id : constant Positive;
 
    -- A sync slot
-   type Sync_Slot is new Time_Slot with
-      record
-         Sync_Id          : TT_Sync_Id;
+   type Active_Slot is abstract new Time_Slot with record
+      -- Indicates if this sync event is the first of a sync sequence
+      Is_Initial       : Boolean := True;
+      -- Indicates if this sync event is part of a work sequence
+      In_Work_Sequence : Boolean := False;
+      -- If In_Work_Sequence this indicates the identifier of the work
+      Task_Id          : TT_Work_Id;
+   end record;
+   type Any_Active_Slot is access all Active_Slot'Class;
 
-         -- Indicates if this sync event is the first of a sync sequence
-         Is_Initial       : Boolean := True;
-         -- Indicates if this sync event is part of a work sequence
-         In_Work_Sequence : Boolean := False;
-         -- If In_Work_Sequence this indicates the identifier of the work
-         Sequence_Id      : TT_Work_Id;
-      end record;
+   -- A sync slot
+   type Sync_Slot is new Active_Slot with record
+      Sync_Id : TT_Sync_Id;
+   end record;
    type Any_Sync_Slot is access all Sync_Slot'Class;
 
    --  To represent the whole duration of the slot
    Full_Slot_Size : constant Ada.Real_Time.Time_Span;
 
-   type Time_Span_Array is array (Criticality_Levels) of Ada.Real_Time.Time_Span;
+   type Time_Span_Array is
+     array (Criticality_Levels) of Ada.Real_Time.Time_Span;
 
    -- A work slot
-   type Work_Slot is abstract new Time_Slot with
-      record
-         Work_Id         : TT_Work_Id;
-         --  Work_Size       : Ada.Real_Time.Time_Span;
-         Work_Sizes      : Time_Span_Array;
-         Padding_Sizes   : Time_Span_Array := (others => Ada.Real_Time.Time_Span_Zero);
-         Is_Continuation : Boolean := False;
+   type Work_Slot is abstract new Active_Slot with record
+      Work_Id         : TT_Work_Id;
+      --  Work_Size       : Ada.Real_Time.Time_Span;
+      Work_Sizes      : Time_Span_Array;
+      Padding_Sizes   : Time_Span_Array :=
+        (others => Ada.Real_Time.Time_Span_Zero);
+      Is_Continuation : Boolean := False;
+   end record;
 
-         -- Indicates if this slot is the first of a work sequence
-         Is_Initial      : Boolean := True;
-      end record;
+   function Work_Duration
+     (S : in Work_Slot; CL : in Criticality_Levels := Criticality_Levels'First)
+      return Ada.Real_Time.Time_Span;
 
-   function Work_Duration (S: in Work_Slot; CL: in Criticality_Levels)
-     return Ada.Real_Time.Time_Span;
-
-   function Padding_Duration (S: in Work_Slot; CL: in Criticality_Levels)
-     return Ada.Real_Time.Time_Span;
+   function Padding_Duration
+     (S : in Work_Slot; CL : in Criticality_Levels := Criticality_Levels'First)
+      return Ada.Real_Time.Time_Span;
 
    type Any_Work_Slot is access all Work_Slot'Class;
 
@@ -109,31 +113,24 @@ package XAda.Dispatching.TTS is
    type Any_Regular_Slot is access all Regular_Slot'Class;
 
    -- An optional work slot
-   type Optional_Slot is new Work_Slot with
-      record
-         -- Indicates if this optional event is part of a work sequence
-         In_Work_Sequence : Boolean := False;
-         -- If In_Work_Sequence this indicates the identifier of the work
-         Sequence_Id      : TT_Work_Id;
-      end record;
-
+   type Optional_Slot is new Work_Slot with null record;
    type Any_Optional_Slot is access all Optional_Slot'Class;
 
    -------------------
    --  Event types  --
    -------------------
 
-   type Overrun_Event is new Ada.Real_Time.Timing_Events.Timing_Event with
-      record
-         Slot : Any_Work_Slot;
-      end record;
+   type Overrun_Event is new Ada.Real_Time.Timing_Events.Timing_Event
+   with record
+      Slot : Any_Work_Slot;
+   end record;
 
    ---------------------
    --  TT Plan types  --
    ---------------------
 
    --  Types representing/accessing TT plans
-   type Time_Triggered_Plan        is array (Natural range <>) of Any_Time_Slot;
+   type Time_Triggered_Plan is array (Natural range <>) of Any_Time_Slot;
    type Time_Triggered_Plan_Access is access all Time_Triggered_Plan;
 
    Plan_Error : exception;
@@ -145,16 +142,18 @@ package XAda.Dispatching.TTS is
    --  To represent the end of a mode change slot
    End_Of_MC_Slot : constant Ada.Real_Time.Time;
 
-   --  Set new TT plan to start at the end of the next mode change slot
+   --  Set new TT plan to start at a given time, if time is within a mode change slot.
+   --  If time is before the next mode change slot, the plan will start at the beginning
+   --  of that mode change slot.
+   --  If no time is given, it will be set to the end of the next mode change slot.
    procedure Set_Plan
-     (TTP : Time_Triggered_Plan_Access;
+     (TTP     : Time_Triggered_Plan_Access;
       At_Time : Ada.Real_Time.Time := End_Of_MC_Slot);
 
    --  TT works use this procedure to wait for their next assigned slot
    --  The When_Was_Released result informs caller of slot starting time
    procedure Wait_For_Activation
-     (Work_Id           : TT_Work_Id;
-      When_Was_Released : out Ada.Real_Time.Time);
+     (Work_Id : TT_Work_Id; When_Was_Released : out Ada.Real_Time.Time);
 
    --  TT works use this procedure to inform that the critical part
    --  of the current slot has been finished. It tranforms the current
@@ -174,8 +173,7 @@ package XAda.Dispatching.TTS is
 
    --  ET works use this procedure to wait for their next asigned sync slot
    procedure Wait_For_Sync
-     (Sync_Id           : TT_Sync_Id;
-      When_Was_Released : out Ada.Real_Time.Time);
+     (Sync_Id : TT_Sync_Id; When_Was_Released : out Ada.Real_Time.Time);
 
    --  Returns current slot
    function Get_Current_Slot return Any_Time_Slot;
@@ -190,32 +188,31 @@ package XAda.Dispatching.TTS is
       Handler : Ada.Real_Time.Timing_Events.Timing_Event_Handler);
 
    --  Sets the system criticality level
-   procedure Set_System_Criticality_Level
-     (New_Level : Criticality_Levels);
+   procedure Set_System_Criticality_Level (New_Level : Criticality_Levels);
 
    --  Returns the current criticality level of the system
    function Get_System_Criticality_Level return Criticality_Levels;
 
    --  Returns the active criticality level in a given work
    function Get_Active_Criticality_Level
-     (Work_Id : TT_Work_Id ) return Criticality_Levels;
+     (Work_Id : TT_Work_Id) return Criticality_Levels;
 
 private
    No_Id          : constant Positive := Positive'Last;
-   Full_Slot_Size : constant Ada.Real_Time.Time_Span := Ada.Real_Time.Time_Span_Last;
+   Full_Slot_Size : constant Ada.Real_Time.Time_Span :=
+     Ada.Real_Time.Time_Span_Last;
    End_Of_MC_Slot : constant Ada.Real_Time.Time := Ada.Real_Time.Time_Last;
 
    protected Time_Triggered_Scheduler
-     with Priority => System.Interrupt_Priority'Last is
+     with Priority => System.Interrupt_Priority'Last
+   is
 
       --  Setting a new TT plan
       procedure Set_Plan
-        (TTP : Time_Triggered_Plan_Access;
-         At_Time : Ada.Real_Time.Time);
+        (TTP : Time_Triggered_Plan_Access; At_Time : Ada.Real_Time.Time);
 
       --  Prepare work to wait for next activation
-      procedure Prepare_For_Activation
-        (Work_Id : TT_Work_Id);
+      procedure Prepare_For_Activation (Work_Id : TT_Work_Id);
 
       --  Transform current slot in a continuation slot
       procedure Continue_Sliced;
@@ -230,8 +227,7 @@ private
       function Get_Last_Plan_Release return Ada.Real_Time.Time;
 
       --  Prepare work to wait for next synchronization point
-      procedure Prepare_For_Sync
-        (Sync_Id : TT_Sync_Id);
+      procedure Prepare_For_Sync (Sync_Id : TT_Sync_Id);
 
       --  Returns current slot
       function Get_Current_Slot return Any_Time_Slot;
@@ -257,8 +253,9 @@ private
       --  This access object is the reason why the scheduler is declared
       --  in this private part, given that this is a generic package.
       --  It should be a constant, but a PO can't have constant components.
-      Next_Slot_Handler_Access : Ada.Real_Time.Timing_Events.Timing_Event_Handler :=
-        Next_Slot_Handler'Access;
+      Next_Slot_Handler_Access :
+        Ada.Real_Time.Timing_Events.Timing_Event_Handler :=
+          Next_Slot_Handler'Access;
 
       --  End of Work timing event
       End_Of_Work_Event : Ada.Real_Time.Timing_Events.Timing_Event;
@@ -270,8 +267,9 @@ private
       --  This access object is the reason why the scheduler is declared
       --  in this private part, given that this is a generic package.
       --  It should be a constant, but a PO can't have constant components.
-      End_Of_Work_Handler_Access : Ada.Real_Time.Timing_Events.Timing_Event_Handler :=
-        End_Of_Work_Handler'Access;
+      End_Of_Work_Handler_Access :
+        Ada.Real_Time.Timing_Events.Timing_Event_Handler :=
+          End_Of_Work_Handler'Access;
 
       --  Reschedule timing event
       Reschedule_Event : Ada.Real_Time.Timing_Events.Timing_Event;
@@ -283,8 +281,9 @@ private
       --  This access object is the reason why the scheduler is declared
       --  in this private part, given that this is a generic package.
       --  It should be a constant, but a PO can't have constant components.
-      Reschedule_Handler_Access : Ada.Real_Time.Timing_Events.Timing_Event_Handler :=
-        Reschedule_Handler'Access;
+      Reschedule_Handler_Access :
+        Ada.Real_Time.Timing_Events.Timing_Event_Handler :=
+          Reschedule_Handler'Access;
 
       --  Hold timing event
       Hold_Event : Ada.Real_Time.Timing_Events.Timing_Event;
@@ -305,39 +304,38 @@ private
          Time_Of_Event     : Ada.Real_Time.Time);
 
       -- System Overrun handler
-      System_Overrun_Handler_Access : Ada.Real_Time.Timing_Events.Timing_Event_Handler :=
-        null;
+      System_Overrun_Handler_Access :
+        Ada.Real_Time.Timing_Events.Timing_Event_Handler := null;
 
       --  Procedure to enforce plan change
-      procedure Change_Plan
-        (At_Time : Ada.Real_Time.Time);
+      procedure Change_Plan (At_Time : Ada.Real_Time.Time);
 
       --  Currently running plan and next plan to switch to, if any
-      Current_Plan              : Time_Triggered_Plan_Access := null;
-      Next_Plan                 : Time_Triggered_Plan_Access := null;
+      Current_Plan : Time_Triggered_Plan_Access := null;
+      Next_Plan    : Time_Triggered_Plan_Access := null;
 
       --  Index numbers of current and next slots in the plan
-      Current_Slot_Index        : Natural := 0;
-      Next_Slot_Index           : Natural := 0;
+      Current_Slot_Index : Natural := 0;
+      Next_Slot_Index    : Natural := 0;
 
       --  Start time of next slot
-      Next_Slot_Release         : Ada.Real_Time.Time := Ada.Real_Time.Time_Last;
+      Next_Slot_Release : Ada.Real_Time.Time := Ada.Real_Time.Time_Last;
 
       --  End of current work slot
-      End_Of_Work_Release       : Ada.Real_Time.Time := Ada.Real_Time.Time_Last;
+      End_Of_Work_Release : Ada.Real_Time.Time := Ada.Real_Time.Time_Last;
 
       --  Hold time for a work slot
-      Hold_Release              : Ada.Real_Time.Time := Ada.Real_Time.Time_Last;
+      Hold_Release : Ada.Real_Time.Time := Ada.Real_Time.Time_Last;
 
       --  Mode change next release
-      Next_Mode_Release         : Ada.Real_Time.Time := Ada.Real_Time.Time_Last;
+      Next_Mode_Release : Ada.Real_Time.Time := Ada.Real_Time.Time_Last;
 
       --  Start time of the current plan
-      Plan_Start_Pending        : Boolean := True;
-      First_Plan_Release        : Ada.Real_Time.Time := Ada.Real_Time.Time_First;
+      Plan_Start_Pending : Boolean := True;
+      First_Plan_Release : Ada.Real_Time.Time := Ada.Real_Time.Time_First;
 
       --  Start time of the first slot
-      First_Slot_Release        : Ada.Real_Time.Time := Ada.Real_Time.Time_First;
+      First_Slot_Release : Ada.Real_Time.Time := Ada.Real_Time.Time_First;
 
    end Time_Triggered_Scheduler;
 

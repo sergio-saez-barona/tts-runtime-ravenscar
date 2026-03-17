@@ -284,7 +284,7 @@ package body TTS_Example_D is
       TT_Slot (Continuation, 200 * ms, 1, HI, (LO => 30 * ms, HI => 50 * ms),
         Is_Initial => False),                                                  --  #03 Seq. 1, continuation of Ms part
       TT_Slot (Sync,         150 * ms, 1, LO, (others => 0 * ms),
-        Sequence_Id => 5),                                                     --  #04 Sync Point for ET Task 1 + Empty
+        Task_Id => 5),                                                     --  #04 Sync Point for ET Task 1 + Empty
       TT_Slot (Terminal,     150 * ms, 1, HI, (LO => 30 * ms, HI => 80 * ms),
         Is_Initial => False),                                                  --  #05 Seq. 1, terminal of Ms part
       TT_Slot (Terminal,     100 * ms, 2, LO, (LO => 30 * ms, HI => zero),

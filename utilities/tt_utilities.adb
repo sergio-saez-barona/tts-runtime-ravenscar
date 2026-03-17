@@ -14,7 +14,7 @@ package body TT_Utilities is
                      Work_Durations : TTS.Time_Span_Array := (others => TTS.Full_Slot_Size);
                      Paddings       : TTS.Time_Span_Array := (others => Time_Span_Zero);
                      Is_Initial     : Boolean := True;
-                     Sequence_Id    : Positive := TTS.No_Id -- Only for Sync slots
+                     Task_Id    : Positive := TTS.No_Id -- Only for Sync slots
                     )
 
                      return TTS.Any_Time_Slot
@@ -35,7 +35,7 @@ package body TT_Utilities is
       end case;
 
       Set_TT_Slot (New_Slot, Kind, Slot_Duration,
-                   Slot_Id, Criticality, Work_Durations, Paddings, Is_Initial, Sequence_Id);
+                   Slot_Id, Criticality, Work_Durations, Paddings, Is_Initial, Task_Id);
 
       return New_Slot;
    end TT_Slot;
@@ -92,7 +92,7 @@ package body TT_Utilities is
                           Work_Durations : TTS.Time_Span_Array := (others => TTS.Full_Slot_Size);
                           Paddings       : TTS.Time_Span_Array := (others => Time_Span_Zero);
                           Is_Initial     : Boolean := True;
-                          Sequence_Id    : Positive := TTS.No_Id -- Only for Sync slots
+                          Task_Id    : Positive := TTS.No_Id -- Only for Sync slots
                          )
    is
       Sync_Slot : TTS.Any_Sync_Slot;
@@ -134,14 +134,14 @@ package body TT_Utilities is
             end;
 
             Sync_Slot.Is_Initial := Is_Initial;
-            Sync_Slot.In_Work_Sequence := (Sequence_Id /= TTS.No_Id);
+            Sync_Slot.In_Work_Sequence := (Task_Id /= TTS.No_Id);
             if Sync_Slot.In_Work_Sequence then
                begin
-                  Sync_Slot.Sequence_Id := TTS.TT_Work_Id (Sequence_Id);
+                  Sync_Slot.Task_Id := TTS.TT_Work_Id (Task_Id);
                exception
                   when Constraint_Error =>
                      raise TTS.Plan_Error
-                     with "Invalid work Id" & Sequence_Id'Image;
+                     with "Invalid work Id" & Task_Id'Image;
                end;
             end if;
 
