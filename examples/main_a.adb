@@ -1,4 +1,3 @@
-
 with TTS_Example_A;
 with Ada.Exceptions; use Ada.Exceptions;
 with Ada.Real_Time;

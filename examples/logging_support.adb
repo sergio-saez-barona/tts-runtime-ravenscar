@@ -34,7 +34,6 @@ package body Logging_Support is
       procedure Log (Event : in Event_Type; Message : in String := "");
    end Serialise;
 
-
    protected body Serialise is
 
       procedure Log (Event : in Event_Type; Message : in String := "") is

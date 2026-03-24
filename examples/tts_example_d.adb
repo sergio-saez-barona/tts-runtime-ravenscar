@@ -256,6 +256,7 @@ package body TTS_Example_D is
    protected Criticality_Manager
      with Priority => System.Interrupt_Priority'Last is
 
+
       procedure Overrun_Handler
         (Event : in out Ada.Real_Time.Timing_Events.Timing_Event);
 

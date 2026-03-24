@@ -348,7 +348,7 @@ package body System.BB.Timing_Events is
    function Time_Of_Event (Event : Timing_Event) return System.BB.Time.Time is
    begin
       if Event.Handler = null then
-         return System.BB.Time.Time'First;
+         return Event.Time_Of_Handling;
       else
          return Event.Timeout;
       end if;

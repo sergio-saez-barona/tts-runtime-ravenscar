@@ -19,8 +19,7 @@ with Ada.Real_Time.Timing_Events;
 
 generic
    type Criticality_Levels is (<>);
-   Number_Of_Work_IDs : Positive;
-   Number_Of_Sync_IDs : Positive := 1;
+   Number_Of_Works : Positive := 1;
    TT_Priority : System.Priority := System.Priority'Last;
    Debug : Boolean := False;
 
@@ -33,11 +32,7 @@ is
 
    --  TT tasks use a Work_Id of this type to identify themselves
    --  when they call the scheduler
-   type TT_Work_Id is new Positive range 1 .. Number_Of_Work_IDs;
-
-   --  ET tasks use a Sync_Id of this type to identify themselves
-   --  when they call the scheduler
-   type TT_Sync_Id is new Positive range 1 .. Number_Of_Sync_IDs;
+   subtype TT_Work_Id is Positive range 1 .. Number_Of_Works;
 
    ------------------
    --  Slot types  --
@@ -45,8 +40,7 @@ is
 
    --  An abstract time slot in the TT plan
    type Time_Slot is abstract tagged record
-      Slot_Size         : Ada.Real_Time.Time_Span;
-      Criticality_Level : Criticality_Levels := Criticality_Levels'First;
+      Slot_Size : Ada.Real_Time.Time_Span;
    end record;
 
    function Slot_Duration (S : in Time_Slot) return Ada.Real_Time.Time_Span
@@ -62,40 +56,28 @@ is
    type Mode_Change_Slot is new Time_Slot with null record;
    type Any_Mode_Change_Slot is access all Mode_Change_Slot'Class;
 
-   --  To represent an slot with no Id
-   No_Id : constant Positive;
-
-   -- A sync slot
-   type Active_Slot is abstract new Time_Slot with record
-      -- Indicates if this sync event is the first of a sync sequence
-      Is_Initial       : Boolean := True;
-      -- Indicates if this sync event is part of a work sequence
-      In_Work_Sequence : Boolean := False;
-      -- If In_Work_Sequence this indicates the identifier of the work
-      Task_Id          : TT_Work_Id;
-   end record;
-   type Any_Active_Slot is access all Active_Slot'Class;
-
-   -- A sync slot
-   type Sync_Slot is new Active_Slot with record
-      Sync_Id : TT_Sync_Id;
-   end record;
-   type Any_Sync_Slot is access all Sync_Slot'Class;
-
    --  To represent the whole duration of the slot
    Full_Slot_Size : constant Ada.Real_Time.Time_Span;
 
    type Time_Span_Array is
      array (Criticality_Levels) of Ada.Real_Time.Time_Span;
 
+   type Work_Slot_Type is (Regular, Continuation, Sync);
+
    -- A work slot
-   type Work_Slot is abstract new Active_Slot with record
-      Work_Id         : TT_Work_Id;
-      --  Work_Size       : Ada.Real_Time.Time_Span;
-      Work_Sizes      : Time_Span_Array;
-      Padding_Sizes   : Time_Span_Array :=
-        (others => Ada.Real_Time.Time_Span_Zero);
-      Is_Continuation : Boolean := False;
+   type Work_Slot (Work_Type : Work_Slot_Type) is new Time_Slot with record
+      Work_Id     : TT_Work_Id;
+      Is_Optional : Boolean := False;
+
+      case Work_Type is
+         when Regular | Continuation =>
+            Work_Sizes    : Time_Span_Array;
+            Padding_Sizes : Time_Span_Array :=
+              (others => Ada.Real_Time.Time_Span_Zero);
+
+         when Sync =>
+            null;
+      end case;
    end record;
 
    function Work_Duration
@@ -108,13 +90,13 @@ is
 
    type Any_Work_Slot is access all Work_Slot'Class;
 
-   -- A regular slot
-   type Regular_Slot is new Work_Slot with null record;
-   type Any_Regular_Slot is access all Regular_Slot'Class;
-
-   -- An optional work slot
-   type Optional_Slot is new Work_Slot with null record;
-   type Any_Optional_Slot is access all Optional_Slot'Class;
+   -- A Initial slot
+   type Initial_Slot (Work_Type : Work_Slot_Type) is
+     new Work_Slot (Work_Type => Work_Type)
+   with record
+      Criticality_Level : Criticality_Levels := Criticality_Levels'First;
+   end record;
+   type Any_Initial_Slot is access all Initial_Slot'Class;
 
    -------------------
    --  Event types  --
@@ -155,6 +137,10 @@ is
    procedure Wait_For_Activation
      (Work_Id : TT_Work_Id; When_Was_Released : out Ada.Real_Time.Time);
 
+   --  TT works use this procedure to inform the scheduler tehy want to skip
+   --    their next assigned slot
+   procedure Skip_Activation (Work_Id : TT_Work_Id);
+
    --  TT works use this procedure to inform that the critical part
    --  of the current slot has been finished. It tranforms the current
    --  slot in a continuation slot
@@ -164,19 +150,19 @@ is
    --   there is no more work to do at TT priority level
    procedure Leave_TT_Level;
 
+   --  ET works use this procedure to wait for their next asigned sync slot
+   procedure Wait_For_Sync
+     (Work_Id : TT_Work_Id; When_Was_Released : out Ada.Real_Time.Time);
+
+   --  Returns current slot
+   function Get_Current_Slot return Any_Time_Slot;
+
    --  Returns the first time the first slot of the current plan was released.
    --   It is equivalent to an Epoch for the current plan.
    function Get_First_Plan_Release return Ada.Real_Time.Time;
 
    --  Returns the last time the first slot of the plan was released
    function Get_Last_Plan_Release return Ada.Real_Time.Time;
-
-   --  ET works use this procedure to wait for their next asigned sync slot
-   procedure Wait_For_Sync
-     (Sync_Id : TT_Sync_Id; When_Was_Released : out Ada.Real_Time.Time);
-
-   --  Returns current slot
-   function Get_Current_Slot return Any_Time_Slot;
 
    --  Sets the default overrun handler
    procedure Set_Default_Overrun_Handler
@@ -198,7 +184,6 @@ is
      (Work_Id : TT_Work_Id) return Criticality_Levels;
 
 private
-   No_Id          : constant Positive := Positive'Last;
    Full_Slot_Size : constant Ada.Real_Time.Time_Span :=
      Ada.Real_Time.Time_Span_Last;
    End_Of_MC_Slot : constant Ada.Real_Time.Time := Ada.Real_Time.Time_Last;
@@ -211,8 +196,9 @@ private
       procedure Set_Plan
         (TTP : Time_Triggered_Plan_Access; At_Time : Ada.Real_Time.Time);
 
-      --  Prepare work to wait for next activation
-      procedure Prepare_For_Activation (Work_Id : TT_Work_Id);
+      --  Process work for next activation
+      procedure Process_Activation
+        (Work_Id : TT_Work_Id; Is_Sync : Boolean; Is_Skipped : Boolean);
 
       --  Transform current slot in a continuation slot
       procedure Continue_Sliced;
@@ -220,17 +206,14 @@ private
       --  Inform the scheduler that you have no more work as a TT task
       procedure Leave_TT_Level;
 
+      --  Returns current slot
+      function Get_Current_Slot return Any_Time_Slot;
+
       --  Returns the first time the first slot of the plan was released
       function Get_First_Plan_Release return Ada.Real_Time.Time;
 
       --  Returns the last time the first slot of the plan was released
       function Get_Last_Plan_Release return Ada.Real_Time.Time;
-
-      --  Prepare work to wait for next synchronization point
-      procedure Prepare_For_Sync (Sync_Id : TT_Sync_Id);
-
-      --  Returns current slot
-      function Get_Current_Slot return Any_Time_Slot;
 
       --  Sets the system-wide overrun handler
       --  Work Overrun handler has precedence, if any

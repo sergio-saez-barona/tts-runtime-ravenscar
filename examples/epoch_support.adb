@@ -2,7 +2,6 @@ package body Epoch_Support is
 
    Init_Time : constant Time := Clock + Milliseconds (1000);
 
-
    -----------
    -- Epoch --
    -----------
