@@ -30,6 +30,10 @@ with System.Tasking;     use System.Tasking;
 with System.TTS_Support; use System.TTS_Support;
 pragma Warnings (On);
 
+--------------------------
+-- XAda.Dispatching.TTS --
+--------------------------
+
 package body XAda.Dispatching.TTS is
 
    --  Conservative bound of measured overhead on a STM32F4 Discovery
@@ -37,8 +41,8 @@ package body XAda.Dispatching.TTS is
    --  23 and 24 us) we charge that overhead at the end of the slot, by
    --  effectively advancing the slot start time by the Overhead time.
    --  This reduces the release jitter even further for TT tasks, to about 3 us
-   Time_Offset  : constant Time_Span := Microseconds (15);
-   Alarm_Jitter : constant Time_Span := Microseconds (5);
+   Time_Offset  : constant Time_Span := Time_Span_Zero; -- Microseconds (15);
+   Alarm_Jitter : constant Time_Span := Time_Span_Zero; -- Microseconds (5);
    Overhead     : constant Time_Span := Time_Offset + Alarm_Jitter;
 
    --  Current Criticality Level
@@ -77,8 +81,9 @@ package body XAda.Dispatching.TTS is
       Overrun_Handler : Timing_Event_Handler := null; --  Overrun handler
 
       --  Activable Work ID
-      Is_Active         : Boolean := True;
-      Criticality_Level : Criticality_Levels := Criticality_Levels'First;
+      Is_Active                : Boolean := True;
+      Active_Criticality_Level : Criticality_Levels :=
+        Criticality_Levels'First;
    end record;
    type Work_Control_Block_Access is access all Work_Control_Block;
 
@@ -160,13 +165,13 @@ package body XAda.Dispatching.TTS is
    function Work_Duration
      (S : in Work_Slot; CL : in Criticality_Levels := Criticality_Levels'First)
       return Time_Span
-   is (S.Work_Sizes (CL));
+   is (if S.Work_Type /= Sync then S.Work_Sizes (CL) else Time_Span_Last);
 
    -- It returns the Padding duration for a given CL.
    function Padding_Duration
      (S : in Work_Slot; CL : in Criticality_Levels := Criticality_Levels'First)
       return Time_Span
-   is (S.Padding_Sizes (CL));
+   is (if S.Work_Type /= Sync then S.Padding_Sizes (CL) else Time_Span_Zero);
 
    ----------------
    --  Set_Plan  --
@@ -344,6 +349,22 @@ package body XAda.Dispatching.TTS is
    end Get_System_Criticality_Level;
 
    ----------------------------------
+   -- Set_Active_Criticality_Level --
+   ----------------------------------
+
+   procedure Set_Active_Criticality_Level
+     (Work_Id : TT_Work_Id; New_Level : Criticality_Levels) is
+   begin
+      if WCB (Work_Id).Work_Thread_Id /= Thread_Self then
+         raise Program_Error
+           with
+             ("Running Task does not correspond to Work_Id " & Work_Id'Image);
+      end if;
+
+      WCB (Work_Id).Active_Criticality_Level := New_Level;
+   end Set_Active_Criticality_Level;
+
+   ----------------------------------
    -- Get_Active_Criticality_Level --
    ----------------------------------
 
@@ -356,7 +377,7 @@ package body XAda.Dispatching.TTS is
              ("Running Task does not correspond to Work_Id " & Work_Id'Image);
       end if;
 
-      return WCB (Work_Id).Criticality_Level;
+      return WCB (Work_Id).Active_Criticality_Level;
    end Get_Active_Criticality_Level;
 
    ------------------------------
@@ -494,7 +515,7 @@ package body XAda.Dispatching.TTS is
 
          Current_WCB.Is_Sliced := True;
 
-         if Current_Work_Slot.Padding_Duration (Current_WCB.Criticality_Level)
+         if Current_Work_Slot.Padding_Duration (Current_WCB.Active_Criticality_Level)
            > Time_Span_Zero
          then
             TTS_Debug ("Cancel_Handler End_of_Work @ Continue_Sliced");
@@ -726,7 +747,7 @@ package body XAda.Dispatching.TTS is
          --  a real overrun situation
          if Current_WCB.Is_Sliced then
             if Current_Work_Slot.Padding_Duration
-                 (Current_WCB.Criticality_Level)
+                 (Current_WCB.Active_Criticality_Level)
               > Time_Span_Zero
             then
                if Current_Thread_Id.Hold_Signaled then
@@ -782,18 +803,18 @@ package body XAda.Dispatching.TTS is
          Check_Work_Control_Block
            (Current_Slot, "Resched handler", Current_Work_Slot, Current_WCB);
 
-         Current_WCB.Criticality_Level := Current_Criticality_Level;
+         Current_WCB.Active_Criticality_Level := Current_Criticality_Level;
 
          if End_Of_Work_Release
            < Current_WCB.Last_Slot_Release
-             + Current_Work_Slot.Work_Duration (Current_WCB.Criticality_Level)
+             + Current_Work_Slot.Work_Duration (Current_WCB.Active_Criticality_Level)
          then
 
             --  Work duration has been increased, so reprogram the EoW event
             End_Of_Work_Release :=
               Current_WCB.Last_Slot_Release
               + Current_Work_Slot.Work_Duration
-                  (Current_WCB.Criticality_Level);
+                  (Current_WCB.Active_Criticality_Level);
             Next_Slot_Release :=
               Current_WCB.Last_Slot_Release + Current_Work_Slot.Slot_Duration;
 
@@ -884,51 +905,7 @@ package body XAda.Dispatching.TTS is
          --  Default scheduling point
          Scheduling_Point := Next_Slot_Point;
 
-         if Current_Slot.all in Empty_Slot'Class then
-            -----------------------------
-            --  Process an Empty_Slot  --
-            -----------------------------
-
-            TTS_Put_Line
-              ("<EE:"
-               & (Duration'Image
-                    (To_Duration (Current_Slot.Slot_Duration) * 1000)
-                  & " ms ")
-               & ">  Slot: "
-               & Current_Slot_Index'Image);
-
-         elsif Current_Slot.all in Mode_Change_Slot'Class then
-            ----------------------------------
-            --  Process a Mode_Change_Slot  --
-            ----------------------------------
-
-            TTS_Put_Line
-              ("<MM:"
-               & (Duration'Image
-                    (To_Duration (Current_Slot.Slot_Duration) * 1000)
-                  & " ms ")
-               & ">  Slot: "
-               & Current_Slot_Index'Image);
-
-            if Next_Plan /= null then
-               --  There's a pending plan change.
-               if Next_Mode_Release = End_Of_MC_Slot then
-                  --  It takes effect at the end of the MC slot
-                  Change_Plan (Next_Slot_Release);
-               elsif Next_Mode_Release <= Now then
-                  --  It takes effect right now
-                  Change_Plan (Now);
-               elsif Next_Mode_Release <= Next_Slot_Release then
-                  --  It takes effect as scheduled, but before the end of
-                  --   this slot
-                  Change_Plan (Next_Mode_Release);
-               else
-                  --  Mode change request remains pending
-                  null;
-               end if;
-            end if;
-
-         elsif Current_Slot.all in Work_Slot'Class then
+         if Current_Slot.all in Work_Slot'Class then
             -----------------------------
             --  Process a Work_Slot --
             -----------------------------
@@ -948,15 +925,14 @@ package body XAda.Dispatching.TTS is
                      Current_WCB.Is_Active := False;
                   else
                      -- System criticality level when the sequence of slots started
-                     Current_WCB.Criticality_Level :=
+                     Current_WCB.Active_Criticality_Level :=
                        Current_Criticality_Level;
 
-                     -- TODO: Sync no tiene work duration
                      Current_WCB.Is_Active :=
                        (Current_Initial_Slot.Criticality_Level
                         >= Current_Criticality_Level
                         and Current_Work_Slot.Work_Duration
-                              (Current_WCB.Criticality_Level)
+                              (Current_WCB.Active_Criticality_Level)
                             > Time_Span_Zero);
                   end if;
                end;
@@ -1018,7 +994,7 @@ package body XAda.Dispatching.TTS is
                      End_Of_Work_Release :=
                        Now
                        + Current_Work_Slot.Work_Duration
-                           (Current_WCB.Criticality_Level);
+                           (Current_WCB.Active_Criticality_Level);
 
                      --  Check what needs be done to the TT task of the new slot
                      if Current_WCB.Skip_Count > 0 then
@@ -1113,14 +1089,14 @@ package body XAda.Dispatching.TTS is
                      if Scheduling_Point = End_Of_Work_Point
                        and then Current_Work_Slot.Work_Type = Continuation
                        and then Current_Work_Slot.Padding_Duration
-                                  (Current_WCB.Criticality_Level)
+                                  (Current_WCB.Active_Criticality_Level)
                                 > Time_Span_Zero
                      then
                         Scheduling_Point := Hold_Point;
                         Hold_Release :=
                           End_Of_Work_Release
                           - Current_Work_Slot.Padding_Duration
-                              (Current_WCB.Criticality_Level);
+                              (Current_WCB.Active_Criticality_Level);
 
                         if Hold_Release < Now then
                            raise Program_Error
@@ -1142,6 +1118,50 @@ package body XAda.Dispatching.TTS is
                --   at the beginning of an sliced sequence, the sequence is ignored completely
                WCB (Current_Work_Slot.Work_Id).Is_Sliced :=
                  (Current_Work_Slot.Work_Type = Continuation);
+            end if;
+
+         elsif Current_Slot.all in Empty_Slot'Class then
+            -----------------------------
+            --  Process an Empty_Slot  --
+            -----------------------------
+
+            TTS_Put_Line
+              ("<EE:"
+               & (Duration'Image
+                    (To_Duration (Current_Slot.Slot_Duration) * 1000)
+                  & " ms ")
+               & ">  Slot: "
+               & Current_Slot_Index'Image);
+
+         elsif Current_Slot.all in Mode_Change_Slot'Class then
+            ----------------------------------
+            --  Process a Mode_Change_Slot  --
+            ----------------------------------
+
+            TTS_Put_Line
+              ("<MM:"
+               & (Duration'Image
+                    (To_Duration (Current_Slot.Slot_Duration) * 1000)
+                  & " ms ")
+               & ">  Slot: "
+               & Current_Slot_Index'Image);
+
+            if Next_Plan /= null then
+               --  There's a pending plan change.
+               if Next_Mode_Release = End_Of_MC_Slot then
+                  --  It takes effect at the end of the MC slot
+                  Change_Plan (Next_Slot_Release);
+               elsif Next_Mode_Release <= Now then
+                  --  It takes effect right now
+                  Change_Plan (Now);
+               elsif Next_Mode_Release <= Next_Slot_Release then
+                  --  It takes effect as scheduled, but before the end of
+                  --   this slot
+                  Change_Plan (Next_Mode_Release);
+               else
+                  --  Mode change request remains pending
+                  null;
+               end if;
             end if;
 
          end if;

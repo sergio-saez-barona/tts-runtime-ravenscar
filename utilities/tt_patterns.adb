@@ -207,6 +207,39 @@ package body TT_Patterns is
          Put_Line (Exception_Message (E));
    end Simple_Synced_ET_Task;
 
+   ---------------------------
+   -- Initial_Final_TT_Task --
+   ---------------------------
+
+   task body Initial_Final_Synced_ET_Task is
+   begin
+
+      Task_State.Work_Id := Work_Id;
+
+      if Synced_Init then
+         TTS.Wait_For_Sync (Work_Id, Task_State.Release_Time);
+      end if;
+
+      Task_State.Initialize;
+
+      loop
+         TTS.Wait_For_Sync (Work_Id, Task_State.Release_Time);
+
+         Task_State.Initial_Code;
+
+         TTS.Wait_For_Sync (Work_Id, Task_State.Release_Time);
+
+         Task_State.Final_Code;
+      end loop;
+   exception
+      when E : Storage_Error =>
+         Put_Line
+           ("Excepción en la tarea Initial_Final_Synced_ET: "
+            & Ada.Task_Identification.Image (Current_Task));
+         Put_Line (Exception_Information (E));
+         Put_Line (Exception_Message (E));
+   end Initial_Final_Synced_ET_Task;
+
    -----------------------------------------
    -- SyncedInitial_OptionalFinal_ET_Task --
    -----------------------------------------

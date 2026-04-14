@@ -1,0 +1,70 @@
+# @name: Plan_E
+# @unit: ms
+# @levels: No
+#!Slot  Duration
+# Work 1 A. Check E->I, E->R
+E       10
+I:1     10          
+E       10
+F:1     10
+
+# Work 2 A. Check E->IS, E->S
+E	10
+IS:2	10
+E	10
+S:2	10
+
+# Work 3 A. Check E->IC + padding
+E	10
+IC:3	10	10	50
+E	10
+F:3	10
+
+# Work 4 A. Check E->C + padding
+E	10
+I:4	10
+E	10
+C:4	10	10	50
+E	10
+F:4	10
+
+# Work 1 B. Check H->I, H->R
+E	10
+I:5	10	10	50
+I:1	10
+F:5	10
+E	10
+I:5	10	10	50
+F:1	10
+F:5	10
+
+# Work 2 B. Check H->IS, H->S
+E	10
+I:5	10	10	50
+IS:2	10
+F:5	10
+E	10
+I:5	10	10	50
+S:2	10
+F:5	10
+
+# Work 3 B. Check H->IC + padding
+I:5	10	10	50
+IC:3	10	10	50
+F:5	10
+E	10
+F:3	10
+
+# Work 4 B. Check H->C + padding
+E	10
+I:4	10
+E	10
+I:5	10	10	50
+C:4	10	10	50
+F:5	10
+E	10
+F:4	10
+
+# Work 6. Report task
+E       10
+I:6	10	

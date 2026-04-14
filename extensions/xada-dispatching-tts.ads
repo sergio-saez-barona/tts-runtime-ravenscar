@@ -179,6 +179,10 @@ is
    --  Returns the current criticality level of the system
    function Get_System_Criticality_Level return Criticality_Levels;
 
+   --  Sets the active criticality level of a given work
+   procedure Set_Active_Criticality_Level
+     (Work_Id : TT_Work_Id; New_Level : Criticality_Levels);
+
    --  Returns the active criticality level in a given work
    function Get_Active_Criticality_Level
      (Work_Id : TT_Work_Id) return Criticality_Levels;

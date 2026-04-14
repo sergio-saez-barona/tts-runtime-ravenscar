@@ -11,11 +11,10 @@ with TT_Mixed_Criticality;
 
 package body TTS_Example_C is
 
-   Number_Of_Work_Ids : constant := 4;
-   Number_Of_Sync_Ids : constant := 2;
+   Number_Of_Work_Ids : constant := 6;
 
    package TTS is new XAda.Dispatching.TTS
-     (TT_Mixed_Criticality.No_Criticality_Levels, Number_Of_Work_Ids, Number_Of_Sync_Ids, Priority'Last - 1);
+     (TT_Mixed_Criticality.No_Criticality_Levels, Number_Of_Work_Ids, Priority'Last - 1);
 
    package TT_Util is new TT_Utilities (TTS);
    use TT_Util;
@@ -63,12 +62,12 @@ package body TTS_Example_C is
    --   8 => Op_Re;  9 => Op_Op
    --  10 => Ho_Re; 11 => Ho_Op;
    --
-   --  Legend: Em = Empty;    Re = Regular;      Sy = Sync; M = Mode change
+   --  Legend: Em = Empty;    Re = Regular;      Sy = Sync; Mo = Mode change
    --          Op = Optional; Ho = Cont. with hold
    --
    RO_Data : Reg_Opt_Cases;
    
-   --  Stats data for cases measurted by sync task
+   --  Stats data for cases measured by sync task
    Sy_Data : Sync_Cases;
    
    
@@ -125,8 +124,6 @@ package body TTS_Example_C is
    --  Worker 2 is an auxiliary simple task with no actions
    W2 : Simple_TT_Task
      (Work_Id => 2, Task_State => W2_State'Access, Synced_Init => False);   
-
-
    
    type Synced_State is new Simple_Task_State with 
       record
@@ -139,7 +136,7 @@ package body TTS_Example_C is
    
    --  Synced task to measure jitter of sync slots
    S1 : Simple_Synced_ET_Task
-     (Sync_Id => 1, Task_State => S1_State'Access, Synced_Init => False);
+     (Work_Id => 5, Task_State => S1_State'Access, Synced_Init => False);
    
    procedure Main_Code (S : in out Synced_State) is
       Jitter : Duration;
@@ -169,7 +166,7 @@ package body TTS_Example_C is
    
    --  Synced 2 is an auxiliary Synced task with null actions
    S2 : Simple_Synced_ET_Task
-     (Sync_Id => 2, Task_State => S2_State'Access, Synced_Init => False);
+     (Work_Id => 6, Task_State => S2_State'Access, Synced_Init => False);
  
    
    
@@ -284,28 +281,28 @@ package body TTS_Example_C is
        TT_Slot (Empty,        10*ms   ),  --  #02 
        TT_Slot (Optional,     10*ms, 1),  --  #03
        TT_Slot (Empty,        10*ms   ),  --  #04
-       TT_Slot (Sync,         10*ms, 1),  --  #05
+       TT_Slot (Sync,         10*ms, 5),  --  #05
        
        TT_Slot (Mode_Change,  10*ms   ),  --  #06 
        TT_Slot (Regular,      10*ms, 1),  --  #07
        TT_Slot (Mode_Change,  10*ms   ),  --  #08 
        TT_Slot (Optional,     10*ms, 1),  --  #09
        TT_Slot (Mode_Change,  10*ms   ),  --  #10
-       TT_Slot (Sync,         10*ms, 1),  --  #11
+       TT_Slot (Sync,         10*ms, 5),  --  #11
        
        TT_Slot (Regular,      10*ms, 2),  --  #12 
        TT_Slot (Regular,      10*ms, 1),  --  #13
        TT_Slot (Regular,      10*ms, 2),  --  #14 
        TT_Slot (Optional,     10*ms, 1),  --  #15
        TT_Slot (Regular,      10*ms, 2),  --  #16 
-       TT_Slot (Sync,         10*ms, 1),  --  #17
+       TT_Slot (Sync,         10*ms, 5),  --  #17
        
-       TT_Slot (Sync,         10*ms, 2),  --  #18 
+       TT_Slot (Sync,         10*ms, 6),  --  #18 
        TT_Slot (Regular,      10*ms, 1),  --  #19
-       TT_Slot (Sync,         10*ms, 2),  --  #20 
+       TT_Slot (Sync,         10*ms, 6),  --  #20 
        TT_Slot (Optional,     10*ms, 1),  --  #21
-       TT_Slot (Sync,         10*ms, 2),  --  #22 
-       TT_Slot (Sync,         10*ms, 1),  --  #23
+       TT_Slot (Sync,         10*ms, 6),  --  #22 
+       TT_Slot (Sync,         10*ms, 5),  --  #23
        
        
        TT_Slot (Optional,     10*ms, 2),  --  #24 
@@ -324,7 +321,7 @@ package body TTS_Example_C is
        TT_Slot (Terminal,     10*ms, 3),  --  #35
 
        TT_Slot (Continuation, 10*ms, 3),  --  #36
-       TT_Slot (Sync,         10*ms, 1),  --  #37
+       TT_Slot (Sync,         10*ms, 5),  --  #37
        TT_Slot (Terminal,     10*ms, 3),  --  #38
 
        TT_Slot (Regular,      10*ms, 4)); --  #39

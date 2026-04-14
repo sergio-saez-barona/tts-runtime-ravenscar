@@ -1,7 +1,7 @@
 package TT_Mixed_Criticality is
    pragma Pure(TT_Mixed_Criticality);
    
-   type No_Criticality_Levels is (None);
+   type No_Criticality_Levels is (Normal);
    
    type Dual_Criticality_Levels is (LO, HI);
    
