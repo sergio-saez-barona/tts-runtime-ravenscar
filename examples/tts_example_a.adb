@@ -112,7 +112,7 @@ package body TTS_Example_A is
    ET6_Code : aliased Synced_ET_Task;
    ET6      :
      SyncedInitial_OptionalFinal_ET_Task
-       (Work_Id => 6, Task_State => ET6_Code'Access, Synced_Init => False);
+       (Work_Id => 6, Task_State => ET6_Code'Access, Synced_Init => False, Priority'Last -1);
 
    task type SyncedSporadic_ET_Task
      (Work_Id : TTS.TT_Work_Id;

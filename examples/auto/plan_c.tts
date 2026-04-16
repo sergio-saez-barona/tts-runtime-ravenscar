@@ -1,0 +1,86 @@
+# @name: Plan_C
+# @unit: ms
+# @levels: No
+#!Slot  Duration
+# Plan start
+I:7     10
+
+# Work 1 A. Check Em->In, Em->Re
+E       10
+# Em->In
+I:1     10          
+E       10
+# Em->Re
+F:1     10
+
+# Work 2 A. Check Em->IS, Em->Sy
+E	    10
+# Em->IS
+IS:2	10
+E	    10
+# Em->Sy
+S:2	    10
+
+# Work 3 A. Check Em->IC
+E	    10
+# Em->IC
+IC:3	10
+E	    10
+F:3	    10
+
+# Work 4 A. Check Em->Co
+E	    10
+I:4	    10
+E	    10
+# Em->Co
+C:4	    10
+E	    10
+F:4	    10
+
+# Work 1 B. Check Ho->In, Ho->Re
+E	    10
+IC:5    10
+# Ho->In
+I:1	    10
+F:5	    10
+E	    10
+IC:5    10
+# Ho->Re
+F:1	    10
+F:5	    10
+
+# Work 2 B. Check Ho->IS, Ho->Sy
+E	    10
+IC:5    10
+# Ho->IS
+IS:2	10
+F:5	    10
+E	    10
+IC:5    10
+# Ho->Sy
+S:2	    10
+F:5	    10
+
+# Work 3 B. Check Ho->IC
+E       10
+IC:5    10
+# Ho->IC
+IC:3	10
+F:5	    10
+E	    10
+F:3	    10
+
+# Work 4 B. Check Ho->Co
+E	    10
+I:4	    10
+E	    10
+IC:5    10
+# Ho->Co
+C:4	    10
+F:5	    10
+E	    10
+F:4	    10
+
+# Work 6. Report task
+E       10
+I:6	    10	

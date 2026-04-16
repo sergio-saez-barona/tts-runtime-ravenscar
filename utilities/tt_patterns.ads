@@ -1,5 +1,6 @@
 with Ada.Real_Time;
 with XAda.Dispatching.TTS;
+with System;
 
 generic
    with package TTS is new XAda.Dispatching.TTS (<>);
@@ -122,7 +123,9 @@ package TT_Patterns is
    task type Simple_Synced_ET_Task
      (Work_Id     : TTS.TT_Work_Id;
       Task_State  : Any_Simple_Task_State;
-      Synced_Init : Boolean);
+      Synced_Init : Boolean;
+      Prio        : System.Priority)
+     with Priority => Prio;
 
    ------------------------------------
    --  INITIAL-FINAL SYNCED ET TASK  --
@@ -133,7 +136,9 @@ package TT_Patterns is
    task type Initial_Final_Synced_ET_Task
      (Work_Id     : TTS.TT_Work_Id;
       Task_State  : Any_Initial_Final_Task_State;
-      Synced_Init : Boolean);
+      Synced_Init : Boolean;
+      Prio        : System.Priority)
+     with Priority => Prio;
 
    ----------------------------------------------------
    --  SYNC_INITIAL - [FINAL] ET TASK                --
@@ -145,6 +150,8 @@ package TT_Patterns is
    task type SyncedInitial_OptionalFinal_ET_Task
      (Work_Id     : TTS.TT_Work_Id;
       Task_State  : Any_Initial_OptionalFinal_Task_State;
-      Synced_Init : Boolean);
+      Synced_Init : Boolean;
+      Prio        : System.Priority)
+     with Priority => Prio;
 
 end TT_Patterns;

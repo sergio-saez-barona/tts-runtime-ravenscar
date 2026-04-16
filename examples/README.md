@@ -18,9 +18,9 @@ This example uses 5 TT tasks:
   
 The plan is stored in the array TT_Plan.
 
-The Main5 procedure is the main subprogram.
+The Main_A procedure is the main subprogram.
 The project file tts_ravenscar.gpr is configured for this example.
-Tested on a modified vefrsion of the ravenscar-full runtime for the STM32F4 Discovery board. 
+Tested on a modified version of the ravenscar-full runtime for the STM32F4 Discovery board. 
 We just changed the clock resolution to make it 10 us (see s-bbbosu.ads in the "runtime" directory)
 
 File "TTS Example A.pdf" gives a sketched representation of the example system and the plan.

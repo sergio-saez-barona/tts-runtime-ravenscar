@@ -200,8 +200,8 @@ package body System.BB.Time is
       end if;
 
       --  Execute expired events of the current CPU
-      if Thread_Self.Active_Priority < Interrupt_Priority'Last or else
-        T_Id.Common.Protected_Action_Nesting = 0
+      if Thread_Self.Active_Priority < Interrupt_Priority'Last
+         or else T_Id.Common.Protected_Action_Nesting = 0
       then
          Timing_Events.Execute_Expired_Timing_Events (Now);
          Thread_Self.Timing_Events_Pending := False;

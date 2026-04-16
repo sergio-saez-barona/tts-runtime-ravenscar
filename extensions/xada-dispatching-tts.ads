@@ -132,12 +132,17 @@ is
      (TTP     : Time_Triggered_Plan_Access;
       At_Time : Ada.Real_Time.Time := End_Of_MC_Slot);
 
-   --  TT works use this procedure to wait for their next assigned slot
+   --  TT works use this procedure to wait for their next assigned TT slot
    --  The When_Was_Released result informs caller of slot starting time
    procedure Wait_For_Activation
      (Work_Id : TT_Work_Id; When_Was_Released : out Ada.Real_Time.Time);
 
-   --  TT works use this procedure to inform the scheduler tehy want to skip
+   --  ET works use this procedure to wait for their next asigned sync slot
+   --  The When_Was_Released result informs caller of slot starting time
+   procedure Wait_For_Sync
+     (Work_Id : TT_Work_Id; When_Was_Released : out Ada.Real_Time.Time);
+
+   --  TT works use this procedure to inform the TT scheduler they want to skip
    --    their next assigned slot
    procedure Skip_Activation (Work_Id : TT_Work_Id);
 
@@ -149,10 +154,6 @@ is
    --  TT works use this procedure to inform the TT scheduler that
    --   there is no more work to do at TT priority level
    procedure Leave_TT_Level;
-
-   --  ET works use this procedure to wait for their next asigned sync slot
-   procedure Wait_For_Sync
-     (Work_Id : TT_Work_Id; When_Was_Released : out Ada.Real_Time.Time);
 
    --  Returns current slot
    function Get_Current_Slot return Any_Time_Slot;

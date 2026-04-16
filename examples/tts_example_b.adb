@@ -126,11 +126,9 @@ package body TTS_Example_B is
    W3 :
      Simple_TT_Task
        (Work_Id => 3, Task_State => W3_State'Access, Synced_Init => False);
-   W4 :
-     Simple_TT_Task   --  Sliced sequence -> 1 cont. + terminal slot
-       (Work_Id => 4,
-        Task_State => W4_State'Access,
-        Synced_Init => False);
+   W4 : --  Sliced sequence -> 1 cont. + terminal slot
+     Simple_TT_Task
+       (Work_Id => 4, Task_State => W4_State'Access, Synced_Init => False);
    W5 :
      Simple_TT_Task
        (Work_Id => 5, Task_State => W5_State'Access, Synced_Init => False);
@@ -230,30 +228,48 @@ package body TTS_Example_B is
 
    S1 :
      Simple_Synced_ET_Task
-       (Work_Id => 8, Task_State => S1_State'Access, Synced_Init => False);
+       (Work_Id => 8,
+        Task_State => S1_State'Access,
+        Synced_Init => False,
+        Prio => 1);
    S2 :
      Simple_Synced_ET_Task
-       (Work_Id => 9, Task_State => S2_State'Access, Synced_Init => False);
+       (Work_Id => 9,
+        Task_State => S2_State'Access,
+        Synced_Init => False,
+        Prio => 2);
    S3 :
      Simple_Synced_ET_Task
-       (Work_Id => 10, Task_State => S3_State'Access, Synced_Init => False);
+       (Work_Id => 10,
+        Task_State => S3_State'Access,
+        Synced_Init => False,
+        Prio => 3);
    S4 :
      Simple_Synced_ET_Task
-       (Work_Id => 11, Task_State => S4_State'Access, Synced_Init => False);
+       (Work_Id => 11,
+        Task_State => S4_State'Access,
+        Synced_Init => False,
+        Prio => 4);
    S5 :
      Simple_Synced_ET_Task
-       (Work_Id => 12, Task_State => S5_State'Access, Synced_Init => False);
+       (Work_Id => 12,
+        Task_State => S5_State'Access,
+        Synced_Init => False,
+        Prio => 5);
    S6 :
      Simple_Synced_ET_Task
-       (Work_Id => 13, Task_State => S6_State'Access, Synced_Init => False);
+       (Work_Id => 13,
+        Task_State => S6_State'Access,
+        Synced_Init => False,
+        Prio => 6);
 
    ms : constant Time_Span := Milliseconds (1);
 
    --  The TT plan
    TT_Plan : aliased TTS.Time_Triggered_Plan :=
-     (TT_Slot (Empty, 10 * ms),  --  #00 
+     (TT_Slot (Empty, 10 * ms),  --  #00
       TT_Slot (Initial_Sync, 10 * ms, 1),  --  #01
-      TT_Slot (Mode_Change, 10 * ms),  --  #02 
+      TT_Slot (Mode_Change, 10 * ms),  --  #02
       TT_Slot (Initial_Sync, 10 * ms, 2),  --  #03
       TT_Slot (Mode_Change, 10 * ms),  --  #04
 
