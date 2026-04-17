@@ -30,7 +30,7 @@ is
    --  Slot id types  --
    ---------------------
 
-   --  TT tasks use a Work_Id of this type to identify themselves
+   --  TT/ET tasks use a Work_Id of this type to identify themselves
    --  when they call the scheduler
    subtype TT_Work_Id is Positive range 1 .. Number_Of_Works;
 

@@ -1,6 +1,13 @@
 # TTS-Runtime-Ravenscar
 Ravenscar implementation at the runtime level of a Time-Triggered scheduler.
 
+## Version 0.5.0
+
+This version modifies the MCS API and the slot data structures while preserving the overall functionality.
+
+* It unifies the synchronisation and work identifiers.
+* It allows the application to explicitly skip any slot in the plan.
+
 ## Version 0.4.1
 
 This version extends the framework with support for **mixed-criticality systems
