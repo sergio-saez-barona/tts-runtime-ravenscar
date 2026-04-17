@@ -41,9 +41,9 @@ package body XAda.Dispatching.TTS is
    --  23 and 24 us) we charge that overhead at the end of the slot, by
    --  effectively advancing the slot start time by the Overhead time.
    --  This reduces the release jitter even further for TT tasks, to about 3 us
-   Time_Offset : constant Time_Span := Microseconds (15);
+   Time_Offset : constant Time_Span := Microseconds (0);
    --  Time needed to program the next alarm in the hardware timer, measured in the platform
-   Alarm_Delay : constant Time_Span := Microseconds (5);
+   Alarm_Delay : constant Time_Span := Microseconds (4);
    Overhead    : constant Time_Span := Time_Offset + Alarm_Delay;
 
    --  Current Criticality Level
