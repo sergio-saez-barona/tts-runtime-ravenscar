@@ -9,23 +9,14 @@ with Epoch_Support; use Epoch_Support;
 with Logging_Support;
 
 with XAda.Dispatching.TTS;
-with TT_Utilities;
 with TT_Patterns;
 with TT_Mixed_Criticality;
+with TTS_Plan_MF;
 
-package body TTS_Example_A is
+package body TTS_Example_MF is
 
-   Number_Of_Work_Ids : constant := 7;
-
-   package TTS is new
-     XAda.Dispatching.TTS
-       (TT_Mixed_Criticality.No_Criticality_Levels,
-        Number_Of_Work_Ids,
-        Priority'Last - 1,
-        False);
-
-   package TT_Util is new TT_Utilities (TTS);
-   use TT_Util;
+   package TT_Plan is new TTS_Plan_MF (Priority'Last - 1);
+   use TT_Plan;
 
    package TT_Patt is new TT_Patterns (TTS);
    use TT_Patt;
@@ -52,9 +43,7 @@ package body TTS_Example_A is
    procedure Main_Code (S : in out First_Simple_Task);
 
    Wk1_Code : aliased First_Simple_Task;
-   Wk1      :
-     Simple_TT_Task
-       (Work_Id => 1, Task_State => Wk1_Code'Access, Synced_Init => False);
+   Wk1      : Simple_TT_Task (Work_Id => 1, Task_State => Wk1_Code'Access);
 
    type First_IMF_Task is new Initial_Mandatory_Final_Task_State with record
       Counter : Natural := 0;
@@ -67,16 +56,14 @@ package body TTS_Example_A is
    Wk2_State : aliased First_IMF_Task;
    Wk2       :
      InitialMandatorySliced_Final_TT_Task
-       (Work_Id => 2, Task_State => Wk2_State'Access, Synced_Init => False);
+       (Work_Id => 2, Task_State => Wk2_State'Access);
 
    type Second_Simple_Task is new Simple_Task_State with null record;
    procedure Initialize (S : in out Second_Simple_Task) is null;
    procedure Main_Code (S : in out Second_Simple_Task);
 
    Wk3_Code : aliased Second_Simple_Task;
-   Wk3      :
-     Simple_TT_Task
-       (Work_Id => 3, Task_State => Wk3_Code'Access, Synced_Init => False);
+   Wk3      : Simple_TT_Task (Work_Id => 3, Task_State => Wk3_Code'Access);
 
    type Second_IMF_Task is new Initial_Mandatory_Final_Task_State with record
       Counter : Natural := 0;
@@ -89,7 +76,7 @@ package body TTS_Example_A is
    Wk4_Code : aliased Second_IMF_Task;
    Wk4      :
      InitialMandatorySliced_Final_TT_Task
-       (Work_Id => 4, Task_State => Wk4_Code'Access, Synced_Init => False);
+       (Work_Id => 4, Task_State => Wk4_Code'Access);
 
    type End_Of_Plan_IF_Task is new Initial_Final_Task_State with null record;
    procedure Initialize (S : in out End_Of_Plan_IF_Task) is null;
@@ -98,8 +85,7 @@ package body TTS_Example_A is
 
    Wk5_Code : aliased End_Of_Plan_IF_Task;
    Wk5      :
-     Initial_Final_TT_Task
-       (Work_Id => 5, Task_State => Wk5_Code'Access, Synced_Init => False);
+     Initial_Final_TT_Task (Work_Id => 5, Task_State => Wk5_Code'Access);
 
    type Synced_ET_Task is new Initial_OptionalFinal_Task_State with record
       Counter : Natural := 0;
@@ -112,7 +98,9 @@ package body TTS_Example_A is
    ET6_Code : aliased Synced_ET_Task;
    ET6      :
      SyncedInitial_OptionalFinal_ET_Task
-       (Work_Id => 6, Task_State => ET6_Code'Access, Synced_Init => False, Prio => Priority'Last -1);
+       (Work_Id => 6,
+        Task_State => ET6_Code'Access,
+        Prio => Priority'Last - 1);
 
    task type SyncedSporadic_ET_Task
      (Work_Id : TTS.TT_Work_Id;
@@ -142,34 +130,6 @@ package body TTS_Example_A is
    end SyncedSporadic_ET_Task;
 
    Sp7 : SyncedSporadic_ET_Task (Work_Id => 7, Offset => 158);
-
-   ms : constant Time_Span := Milliseconds (1);
-
-   --  The TT plan
-   TT_Plan : aliased TTS.Time_Triggered_Plan :=
-     (TT_Slot (Empty, 100 * ms),  --  #00
-      TT_Slot (Initial, 50 * ms, 1),  --  #00 Single slot for 1st seq. start
-      TT_Slot (Empty, 150 * ms),  --  #01
-      TT_Slot (Initial, 50 * ms, 3),  --  #02 Single slot for 2nd seq. start
-      TT_Slot (Initial_Sync, 150 * ms, 7),  --  #03 Sp. 7, Sync point for sporadic task
-      TT_Slot (Initial, 50 * ms, 2),  --  #04 IMF. 2, IMs part
-      TT_Slot (Initial, 50 * ms, 4),  --  #05 IMF. 4, IMs part
-      TT_Slot (Empty, 300 * ms),  --  #06
-      TT_Slot (Continuation, 50 * ms, 2),  --  #07 IMF. 2, continuation of Ms part
-      TT_Slot (Empty, 150 * ms),  --  #08
-      TT_Slot (Terminal, 100 * ms, 4),  --  #09 IMF. 4, terminal of Ms part
-      TT_Slot (Empty, 100 * ms),  --  #10
-      TT_Slot (Terminal, 50 * ms, 2),  --  #11 IMF. 2, terminal of Ms part
-      TT_Slot (Initial_Sync, 150 * ms, 6),  --  #12 ET. 6, Sync Point for ET Task
-      TT_Slot (Final, 50 * ms, 4),  --  #13 IMF. 4, F part
-      TT_Slot (Empty, 100 * ms),  --  #14
-      TT_Slot (Final, 50 * ms, 2),  --  #15 IMF. 2, F part
-      TT_Slot (Empty, 80 * ms),  --  #16
-      TT_Slot (Initial, 50 * ms, 5),  --  #17 IF. 5, I part of end of plan
-      TT_Slot (Empty, 70 * ms),  --  #18
-      TT_Slot (Final, 70 * ms, 6),  --  #19 ET. 6, F part of synced ET
-      TT_Slot (Final, 50 * ms, 5),  --  #20 IF. 5, F part of end of plan
-      TT_Slot (Mode_Change, 80 * ms));  --  #21
 
    --  Actions of sequence initialisations
    procedure Main_Code (S : in out First_Simple_Task) is
@@ -415,9 +375,9 @@ package body TTS_Example_A is
    begin
       Put_Line ("Waiting for epoch");
       delay until Epoch_Support.Epoch;
-      TTS.Set_Plan (TT_Plan'Access);
+      TTS.Set_Plan (Plan_MF'Access);
       Put_Line ("Waiting for Judgement day");
       delay until Ada.Real_Time.Time_Last;
    end Main;
 
-end TTS_Example_A;
+end TTS_Example_MF;

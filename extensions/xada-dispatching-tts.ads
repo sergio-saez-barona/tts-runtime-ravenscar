@@ -68,6 +68,7 @@ is
    type Work_Slot (Work_Type : Work_Slot_Type) is new Time_Slot with record
       Work_Id     : TT_Work_Id;
       Is_Optional : Boolean := False;
+      Is_Initial  : Boolean := False;
 
       case Work_Type is
          when Regular | Continuation =>
@@ -90,17 +91,11 @@ is
 
    type Any_Work_Slot is access all Work_Slot'Class;
 
-   -- A Initial slot
-   type Initial_Slot (Work_Type : Work_Slot_Type) is
-     new Work_Slot (Work_Type => Work_Type)
-   with record
-      Criticality_Level : Criticality_Levels := Criticality_Levels'First;
-   end record;
-   type Any_Initial_Slot is access all Initial_Slot'Class;
-
    -------------------
    --  Event types  --
    -------------------
+
+   Work_Cancelled : exception;
 
    type Overrun_Event is new Ada.Real_Time.Timing_Events.Timing_Event
    with record
@@ -131,6 +126,12 @@ is
    procedure Set_Plan
      (TTP     : Time_Triggered_Plan_Access;
       At_Time : Ada.Real_Time.Time := End_Of_MC_Slot);
+
+   --  Task initialization procedure. It must be called by TT/ET works at the beginning of their execution.
+   procedure Work_Initialization
+     (Work_Id           : TT_Work_Id;
+      Criticality_Level : Criticality_Levels := Criticality_Levels'First;
+      Is_Cancellable    : Boolean := False);
 
    --  TT works use this procedure to wait for their next assigned TT slot
    --  The When_Was_Released result informs caller of slot starting time
@@ -200,6 +201,12 @@ private
       --  Setting a new TT plan
       procedure Set_Plan
         (TTP : Time_Triggered_Plan_Access; At_Time : Ada.Real_Time.Time);
+
+      --  Task initialization procedure. It must be called by TT/ET works at the beginning of their execution.
+      procedure Work_Initialization
+        (Work_Id           : TT_Work_Id;
+         Criticality_Level : Criticality_Levels;
+         Is_Cancellable    : Boolean);
 
       --  Process work for next activation
       procedure Process_Activation

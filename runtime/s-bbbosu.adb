@@ -75,7 +75,7 @@ package body System.BB.Board_Support is
    --  time that interrupts may be disabled.
 
    Tick_Period : constant Time.Timer_Interval := Clock_Frequency / 10_000;
-   --  @modified Change the Sys_Tick to 10us (100 kHz)
+   --  @modified Change the Sys_Tick to 100us (10 kHz)
 
    type Sys_Tick_Registers is record
       SYST_CSR   : Word;

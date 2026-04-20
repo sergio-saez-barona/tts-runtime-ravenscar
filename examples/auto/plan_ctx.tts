@@ -1,4 +1,6 @@
-# @name: Plan_C
+# Plan for measuring context switch overhead between
+#  different slot combinations
+# @name: Plan_Ctx
 # @unit: ms
 # @levels: No
 #!Slot  Duration

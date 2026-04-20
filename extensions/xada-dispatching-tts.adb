@@ -63,11 +63,23 @@ package body XAda.Dispatching.TTS is
 
    --  Run time TT work info
    type Work_Control_Block is record
-      Has_Completed : Boolean := True;      --  TT part has completed
-      Is_Waiting    : Boolean := False;     --  Task is waiting for release
-      Is_Sliced     : Boolean := False;     --  Task is in a sliced sequence
+      Has_Completed : Boolean := True;   --  TT part has completed
+      Is_Waiting    : Boolean := False;  --  Task is waiting for release
+      Is_Sliced     : Boolean := False;  --  Task is in a sliced sequence
 
-      Is_Sync : Boolean := False;     --  Expected Task is ET
+      Is_Sync        : Boolean := False; --  Expected Task is ET
+      Is_Cancellable : Boolean := False; --  Indicates if it is cancellable
+
+      --  Indicates if the work has been cancelled
+      Has_Been_Cancelled : Boolean := False;
+      --  Activable Work ID
+      Is_Active          : Boolean := True;
+
+      --  Criticality level of the work, used for scheduling
+      Work_Criticality_Level   : Criticality_Levels :=
+        Criticality_Levels'First;
+      Active_Criticality_Level : Criticality_Levels :=
+        Criticality_Levels'First;
 
       --  Indicates how many slots have been skipped
       Skip_Count : Natural := 0;
@@ -81,10 +93,6 @@ package body XAda.Dispatching.TTS is
       Event           : Overrun_Event;
       Overrun_Handler : Timing_Event_Handler := null; --  Overrun handler
 
-      --  Activable Work ID
-      Is_Active                : Boolean := True;
-      Active_Criticality_Level : Criticality_Levels :=
-        Criticality_Levels'First;
    end record;
    type Work_Control_Block_Access is access all Work_Control_Block;
 
@@ -110,19 +118,50 @@ package body XAda.Dispatching.TTS is
       return To_Duration (Offset)'Image;
    end TT_Time;
 
-   procedure TTS_Put_Line (Item : in String) is
+   procedure TTS_Put_Line (Item : String) with Inline is
    begin
       if Debug then
          Put_Line (Item);
       end if;
    end TTS_Put_Line;
 
-   procedure TTS_Debug (Item : in String) is
+   procedure TTS_Debug (Item : String) with Inline is
    begin
       if Debug then
          Put_Line (TT_Timestamp & " > " & Item);
       end if;
    end TTS_Debug;
+
+   procedure TTS_Show_Slot
+     (Slot_Type : String; Current_Slot : Any_Time_Slot; Slot_Index : Integer)
+   with Inline
+   is
+      Slot_Name : String := Slot_Type;
+   begin
+      if Debug then
+         if Current_Slot.all in Work_Slot'Class then
+            declare
+               Current_Work_Slot : Any_Work_Slot :=
+                 Any_Work_Slot (Current_Slot);
+            begin
+               if Current_Work_Slot.Is_Initial then
+                  Slot_Name := "I" & Slot_Type (Slot_Type'First);
+               end if;
+            end;
+         end if;
+
+         TTS_Put_Line
+           ("<"
+            & Slot_Name
+            & " Slot: "
+            & Slot_Index'Image
+            & ">"
+            & Duration'Image (To_Duration (Current_Slot.Slot_Duration) * 1000)
+            & " ms "
+            & " CL: "
+            & Current_Criticality_Level'Image);
+      end if;
+   end TTS_Show_Slot;
 
    ------------------------------
    -- Check_Work_Control_Block --
@@ -175,7 +214,7 @@ package body XAda.Dispatching.TTS is
    function Work_Duration
      (S : in Work_Slot; CL : in Criticality_Levels := Criticality_Levels'First)
       return Time_Span
-   is (if S.Work_Type /= Sync then S.Work_Sizes (CL) else Time_Span_Last);
+   is (if S.Work_Type /= Sync then S.Work_Sizes (CL) else S.Slot_Size);
 
    -- It returns the Padding duration for a given CL.
    function Padding_Duration
@@ -198,6 +237,19 @@ package body XAda.Dispatching.TTS is
       end if;
    end Set_Plan;
 
+   ---------------------------
+   --  Work_Initialization  --
+   ---------------------------
+
+   procedure Work_Initialization
+     (Work_Id           : TT_Work_Id;
+      Criticality_Level : Criticality_Levels := Criticality_Levels'First;
+      Is_Cancellable    : Boolean := False) is
+   begin
+      Time_Triggered_Scheduler.Work_Initialization
+        (Work_Id, Criticality_Level, Is_Cancellable);
+   end Work_Initialization;
+
    --------------------------
    --  Wait_For_Activation --
    --------------------------
@@ -216,6 +268,11 @@ package body XAda.Dispatching.TTS is
 
       --  Suspend until the next slot for Work_Id starts
       Suspend_Until_True (Release_Point (Work_Id));
+
+      if WCB (Work_Id).Has_Been_Cancelled then
+         raise Work_Cancelled
+           with ("Work_Id " & Work_Id'Image & " was cancelled");
+      end if;
 
       --  Scheduler updated Last_Release when it released the worker task
       When_Was_Released := WCB (Work_Id).Last_Release;
@@ -271,7 +328,11 @@ package body XAda.Dispatching.TTS is
       --    the SO is open and the ET task will not suspend
       Suspend_Until_True (Release_Point (Work_Id));
 
-      --  Scheduler updated Last_Release when it released the worker task
+      if WCB (Work_Id).Has_Been_Cancelled then
+         raise Work_Cancelled
+           with ("Work_Id " & Work_Id'Image & " was cancelled");
+      end if;
+
       When_Was_Released := WCB (Work_Id).Last_Release;
 
    end Wait_For_Sync;
@@ -444,6 +505,28 @@ package body XAda.Dispatching.TTS is
 
       end Set_Plan;
 
+      -------------------------
+      -- Work_Initialization --
+      -------------------------
+
+      procedure Work_Initialization
+        (Work_Id           : TT_Work_Id;
+         Criticality_Level : Criticality_Levels;
+         Is_Cancellable    : Boolean) is
+      begin
+         if WCB (Work_Id).Work_Thread_Id = Null_Thread_Id then
+            --  Register caller
+            WCB (Work_Id).Work_Thread_Id := Thread_Self;
+         elsif WCB (Work_Id).Work_Thread_Id /= Thread_Self then
+            --  Caller was not registered with this Work_Id
+            raise Program_Error with ("Work_Id misuse");
+         end if;
+
+         WCB (Work_Id).Work_Criticality_Level := Criticality_Level;
+         WCB (Work_Id).Is_Cancellable := Is_Cancellable;
+         WCB (Work_Id).Has_Been_Cancelled := False;
+      end Work_Initialization;
+
       ------------------------
       -- Process_Activation --
       ------------------------
@@ -455,14 +538,8 @@ package body XAda.Dispatching.TTS is
          Current_WCB  : Work_Control_Block_Access;
          Cancelled    : Boolean;
       begin
-         --  Register the Work_Id with the first task using it.
          --  Use of the Work_Id by another task breaks the model and causes PE
-         if WCB (Work_Id).Work_Thread_Id = Null_Thread_Id then
-
-            --  First time WFA called with this Work_Id -> Register caller
-            WCB (Work_Id).Work_Thread_Id := Thread_Self;
-
-         elsif WCB (Work_Id).Work_Thread_Id /= Thread_Self then
+         if WCB (Work_Id).Work_Thread_Id /= Thread_Self then
 
             --  Caller was not registered with this Work_Id
             raise Program_Error with ("Work_Id misuse");
@@ -483,15 +560,10 @@ package body XAda.Dispatching.TTS is
                   Current_WCB.Has_Completed := True;
 
                   --  Cancel the Hold and End of Work handlers, if required
-
-                  TTS_Debug ("Cancel_Handler Hold @ Process_Activation");
                   Hold_Event.Cancel_Handler (Cancelled);
-                  TTS_Debug
-                    ("Cancel_Handler End_of_Work @ Process_Activation");
                   End_Of_Work_Event.Cancel_Handler (Cancelled);
 
                   --  Set timing event for the next scheduling point
-                  TTS_Debug ("Set_Handler Next_Slot @ Process_Activation");
                   Next_Slot_Event.Set_Handler
                     (Next_Slot_Release - Overhead, Next_Slot_Handler_Access);
                end if;
@@ -529,13 +601,10 @@ package body XAda.Dispatching.TTS is
               (Current_WCB.Active_Criticality_Level)
            > Time_Span_Zero
          then
-            TTS_Debug ("Cancel_Handler End_of_Work @ Continue_Sliced");
             End_Of_Work_Event.Cancel_Handler (Cancelled);
-            TTS_Debug ("Set_Handler Hold @ Continue_Sliced");
             Hold_Event.Set_Handler
               (Hold_Release - Alarm_Delay, Hold_Handler_Access);
          else
-            TTS_Debug ("Set_Handler End_of_Work @ Continue_Sliced");
             End_Of_Work_Event.Set_Handler
               (End_Of_Work_Release - Alarm_Delay, End_Of_Work_Handler_Access);
          end if;
@@ -560,13 +629,10 @@ package body XAda.Dispatching.TTS is
          Current_WCB.Has_Completed := True;
 
          --  Cancel the Hold and End of Work handlers, if required
-         TTS_Debug ("Cancel_Handler Hold @ Leave_TT_Level");
          Hold_Event.Cancel_Handler (Cancelled);
-         TTS_Debug ("Cancel_Handler End_Of_Work @ Leave_TT_Level");
          End_Of_Work_Event.Cancel_Handler (Cancelled);
 
          --  Set timing event for the next scheduling point
-         TTS_Debug ("Set_Handler Next_Slot @ Leave_TT_Level");
          Next_Slot_Event.Set_Handler
            (Next_Slot_Release - Overhead, Next_Slot_Handler_Access);
 
@@ -589,7 +655,6 @@ package body XAda.Dispatching.TTS is
          Next_Slot_Index := Current_Plan.all'First;
          Next_Slot_Release := At_Time;
          Plan_Start_Pending := True;
-         TTS_Debug ("Set_Handler Next_Slot @ Change_Plan :" & TT_Timestamp);
          Next_Slot_Event.Set_Handler
            (At_Time - Overhead, Next_Slot_Handler_Access);
       end Change_Plan;
@@ -655,7 +720,6 @@ package body XAda.Dispatching.TTS is
          Current_WCB     : Work_Control_Block_Access;
          Overrun_Handler : Timing_Event_Handler := null;
       begin
-         TTS_Debug ("Executing Overrun_Detected ... ");
          Current_WCB := WCB (Current_Work_Slot.Work_Id)'access;
 
          Overrun_Handler :=
@@ -672,7 +736,6 @@ package body XAda.Dispatching.TTS is
             --  the handlers bellow are not directly executed after this one
 
             --  Executes the Overrun handler as soon as possible
-            TTS_Debug ("Set_Handler Overrun @ Overrun_Detected");
             Current_WCB.Event.Set_Handler (Time_Of_Event, Overrun_Handler);
 
             --  Program the Reschedule event to check if the
@@ -680,7 +743,6 @@ package body XAda.Dispatching.TTS is
             --  ARM12 D.15 20/2
             --   "If several timing events are set for the same time,
             --    they are executed in FIFO order of being set."
-            TTS_Debug ("Set_Handler Reschedule @ Overrun_Detected");
             Reschedule_Event.Set_Handler
               (Time_Of_Event, Reschedule_Handler_Access);
          else
@@ -702,8 +764,6 @@ package body XAda.Dispatching.TTS is
          Current_WCB       : Work_Control_Block_Access;
          Current_Thread_Id : Thread_Id;
       begin
-         TTS_Debug ("Executing Hold_Handler ... ");
-
          Check_Work_Control_Block
            (Current_Slot, "Hold handler", Current_Work_Slot, Current_WCB);
 
@@ -714,7 +774,6 @@ package body XAda.Dispatching.TTS is
             Hold (Current_Thread_Id);
 
             --  Set timing event for the next scheduling point
-            TTS_Debug ("Set_Handler End_of_Work @ Hold_Handler");
             End_Of_Work_Event.Set_Handler
               (End_Of_Work_Release - Alarm_Delay, End_Of_Work_Handler_Access);
          --  Next_Slot handler will be set when this work was finished
@@ -735,8 +794,6 @@ package body XAda.Dispatching.TTS is
          Current_Thread_Id : Thread_Id;
          Now               : Time;
       begin
-         TTS_Debug ("Executing End_Of_Work_Handler ... ");
-
          Check_Work_Control_Block
            (Current_Slot, "EoW handler", Current_Work_Slot, Current_WCB);
 
@@ -783,14 +840,11 @@ package body XAda.Dispatching.TTS is
 
             if (Next_Slot_Release - Time_Offset > Now) then
                --  Set timing event for the next scheduling point
-               TTS_Debug ("Set_Handler Next_Slot @ End_of_Work_Handler");
                Next_Slot_Event.Set_Handler
                  (Next_Slot_Release - Overhead, Next_Slot_Handler_Access);
             else
                --  Directly process the new slot event
-               TTS_Debug ("Execute_Handler Next_Slot @ End_of_Work_Handler");
                Next_Slot_Handler (Event);
-               -- Next_Slot_Event.Set_Handler (Now, Next_Slot_Handler_Access);
             end if;
 
          else
@@ -811,8 +865,6 @@ package body XAda.Dispatching.TTS is
          Current_WCB       : Work_Control_Block_Access;
 
       begin
-         TTS_Debug ("Executing Reschedule_Handler ... ");
-
          Check_Work_Control_Block
            (Current_Slot, "Resched handler", Current_Work_Slot, Current_WCB);
 
@@ -842,7 +894,6 @@ package body XAda.Dispatching.TTS is
             end if;
 
             --  Reschedule event can only be emitted from an EoW handler
-            TTS_Debug ("Set_Handler End_of_Work @ Reschedule_Handler");
             End_Of_Work_Event.Set_Handler
               (End_Of_Work_Release - Alarm_Delay, End_Of_Work_Handler_Access);
 
@@ -876,8 +927,6 @@ package body XAda.Dispatching.TTS is
          Scheduling_Point  : Scheduling_Point_Type;
          Now               : Time;
       begin
-         TTS_Debug ("Executing Next_Slot_Handler ... ");
-
          --  This is the current time, according to the plan
          Now := Next_Slot_Release;
 
@@ -896,7 +945,6 @@ package body XAda.Dispatching.TTS is
 
             Plan_Start := Now;
             First_Slot_Release := Now;
-            TTS_Debug ("Plan starts");
          end if;
 
          --  Obtain next slot index. The plan is repeated circularly
@@ -924,26 +972,14 @@ package body XAda.Dispatching.TTS is
             --  Process an Empty_Slot  --
             -----------------------------
 
-            TTS_Put_Line
-              ("<EE:"
-               & (Duration'Image
-                    (To_Duration (Current_Slot.Slot_Duration) * 1000)
-                  & " ms ")
-               & ">  Slot: "
-               & Current_Slot_Index'Image);
+            TTS_Show_Slot ("Em", Current_Slot, Current_Slot_Index);
 
          elsif Current_Slot.all in Mode_Change_Slot'Class then
             ----------------------------------
             --  Process a Mode_Change_Slot  --
             ----------------------------------
 
-            TTS_Put_Line
-              ("<MM:"
-               & (Duration'Image
-                    (To_Duration (Current_Slot.Slot_Duration) * 1000)
-                  & " ms ")
-               & ">  Slot: "
-               & Current_Slot_Index'Image);
+            TTS_Show_Slot ("MC", Current_Slot, Current_Slot_Index);
 
             if Next_Plan /= null then
                --  There's a pending plan change.
@@ -972,50 +1008,31 @@ package body XAda.Dispatching.TTS is
             Current_WCB := WCB (Current_Work_Slot.Work_Id)'access;
             Current_Thread_Id := Current_WCB.Work_Thread_Id;
 
-            if Current_Work_Slot.all in Initial_Slot'Class then
-               declare
-                  Current_Initial_Slot : Any_Initial_Slot :=
-                    Any_Initial_Slot (Current_Work_Slot);
-               begin
-                  if Current_WCB.Skip_Count > 0 then
-                     --  If the initial slot skipped, the whole sequence is skipped
-                     Current_WCB.Skip_Count := Current_WCB.Skip_Count - 1;
-                     Current_WCB.Is_Active := False;
-                  else
-                     -- System criticality level when the sequence of slots started
-                     Current_WCB.Active_Criticality_Level :=
-                       Current_Criticality_Level;
+            if Current_Work_Slot.Is_Initial then
+               if Current_WCB.Skip_Count > 0 then
+                  --  If the initial slot skipped, the whole sequence is skipped
+                  Current_WCB.Skip_Count := Current_WCB.Skip_Count - 1;
+                  Current_WCB.Is_Active := False;
+               else
+                  -- System criticality level when the sequence of slots started
+                  Current_WCB.Active_Criticality_Level :=
+                    Current_Criticality_Level;
 
-                     Current_WCB.Is_Active :=
-                       (Current_Initial_Slot.Criticality_Level
-                        >= Current_Criticality_Level
-                        and
-                          Current_Work_Slot.Work_Duration
-                            (Current_WCB.Active_Criticality_Level)
-                          > Time_Span_Zero);
-                  end if;
-               end;
+                  Current_WCB.Is_Active :=
+                    (Current_WCB.Work_Criticality_Level
+                     >= Current_Criticality_Level
+                     and
+                       Current_Work_Slot.Work_Duration
+                         (Current_WCB.Active_Criticality_Level)
+                       > Time_Span_Zero);
+               end if;
             end if;
-
-            TTS_Put_Line
-              ("<"
-               & (if Current_Work_Slot.Work_Type = Sync then "S" else "W")
-               & Current_Work_Slot.Work_Id'Image
-               & ": "
-               & (Duration'Image
-                    (To_Duration (Current_Slot.Slot_Duration) * 1000)
-                  & " ms ")
-               & "> "
-               & " Slot: "
-               & Current_Slot_Index'Image
-               & " Active: "
-               & Current_WCB.Is_Active'Image
-               & " Waiting: "
-               & Current_WCB.Is_Waiting'Image);
 
             if Current_WCB.Is_Active then
                case Current_Work_Slot.Work_Type is
                   when Sync                   =>
+                     TTS_Show_Slot ("Sy", Current_Slot, Current_Slot_Index);
+
                      if Current_WCB.Skip_Count > 0 then
                         --  If the skip slot has been skipped
                         Current_WCB.Skip_Count := Current_WCB.Skip_Count - 1;
@@ -1030,6 +1047,15 @@ package body XAda.Dispatching.TTS is
                            Current_WCB.Last_Slot_Release := Now;
                            Current_WCB.Is_Waiting := False;
                            Current_WCB.Has_Completed := True;
+
+                           Current_WCB.Has_Been_Cancelled :=
+                             Current_WCB.Has_Been_Cancelled
+                             or else
+                               (Current_WCB.Is_Cancellable
+                                and then
+                                  Current_WCB.Work_Criticality_Level
+                                  < Current_Criticality_Level);
+
                            Set_True
                              (Release_Point (Current_Work_Slot.Work_Id));
                         elsif Current_Work_Slot.Is_Optional then
@@ -1048,6 +1074,13 @@ package body XAda.Dispatching.TTS is
                      end if;
 
                   when Regular | Continuation =>
+
+                     TTS_Show_Slot
+                       ((if Current_Work_Slot.Work_Type = Regular
+                         then "Re"
+                         else "Co"),
+                        Current_Slot,
+                        Current_Slot_Index);
 
                      -- This value can be used within the Hold_Handler
                      End_Of_Work_Release :=
@@ -1111,10 +1144,21 @@ package body XAda.Dispatching.TTS is
                               Current_WCB.Last_Slot_Release := Now;
                               Current_WCB.Has_Completed := False;
                               Current_WCB.Is_Waiting := False;
+
+                              Current_WCB.Has_Been_Cancelled :=
+                                Current_WCB.Has_Been_Cancelled
+                                or else
+                                  (Current_WCB.Is_Cancellable
+                                   and then
+                                     Current_WCB.Work_Criticality_Level
+                                     < Current_Criticality_Level);
+
                               Set_True
                                 (Release_Point (Current_Work_Slot.Work_Id));
 
-                              Scheduling_Point := End_Of_Work_Point;
+                              if not Current_WCB.Has_Been_Cancelled then
+                                 Scheduling_Point := End_Of_Work_Point;
+                              end if;
 
                            elsif Current_Work_Slot.Is_Optional then
                               --  If the slot is optional, it is not an error if the TT
@@ -1189,24 +1233,15 @@ package body XAda.Dispatching.TTS is
          --  Set timing event for the next scheduling point
          case Scheduling_Point is
             when Next_Slot_Point   =>
-               TTS_Debug
-                 ("Set_Handler Next_Slot @ Next_Slot_Handler : "
-                  & TT_Time (Next_Slot_Release));
                Next_Slot_Event.Set_Handler
                  (Next_Slot_Release - Overhead, Next_Slot_Handler_Access);
 
             when End_Of_Work_Point =>
-               TTS_Debug
-                 ("Set_Handler End_of_Work @ Next_Slot_Handler : "
-                  & TT_Time (End_Of_Work_Release));
                End_Of_Work_Event.Set_Handler
                  (End_Of_Work_Release - Overhead, End_Of_Work_Handler_Access);
             --  Next_Slot handler will be set when this work finishes
 
             when Hold_Point        =>
-               TTS_Debug
-                 ("Set_Handler Hold @ Next_Slot_Handler : "
-                  & TT_Time (Hold_Release));
                Hold_Event.Set_Handler
                  (Hold_Release - Overhead, Hold_Handler_Access);
             --  End_of_Work handler will be set when this event triggers

@@ -1,0 +1,36 @@
+# Plan for testing multi-frame support using TT patterns
+# @name: Plan_MF
+# @unit: ms
+# @levels: No
+#00
+E       100
+#01 Single slot for 1st seq. start
+I:1     200     50
+#02 Single slot for 2nd seq. start
+I:3     50
+#03 Sp. 7, Sync point for sporadic task
+IS:7    150
+#04 IMF. 2, IMs part
+I:2     50
+#05 IMF. 4, IMs part
+I:4     350     50
+#06 IMF. 2, continuation of Ms part
+C:2     200     50
+#07 IMF. 4, terminal of Ms part
+R:4     200     100
+#08 IMF. 2, terminal of Ms part
+R:2     50
+#09 ET. 6, Sync Point for ET Task
+IS:6    150
+#10 IMF. 4, F part
+F:4     150     50
+#11 IMF. 2, F part
+F:2     130     50
+#12 IF. 5, I part of end of plan
+I:5     120     50
+#13 ET. 6, F part of synced ET
+F:6     70
+#14 IF. 5, F part of end of plan
+F:5     50
+#15
+MC      80

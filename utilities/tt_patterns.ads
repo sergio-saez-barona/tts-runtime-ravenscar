@@ -7,14 +7,21 @@ generic
 package TT_Patterns is
 
    type Task_State is abstract tagged record
-      Release_Time : Ada.Real_Time.Time := Ada.Real_Time.Time_First;
-      Work_Id      : TTS.TT_Work_Id;
+      Release_Time      : Ada.Real_Time.Time := Ada.Real_Time.Time_First;
+      Work_Id           : TTS.TT_Work_Id;
+      Synced_Init       : Boolean := False;
+      Is_Cancellable    : Boolean := False;
+      Criticality_Level : TTS.Criticality_Levels :=
+        TTS.Criticality_Levels'First;
    end record;
 
    -- Simple Task State. Initialize + Main_Code
    type Simple_Task_State is abstract new Task_State with null record;
    procedure Initialize (S : in out Simple_Task_State) is abstract;
    procedure Main_Code (S : in out Simple_Task_State) is abstract;
+   procedure Cancellation_Code
+     (S : in out Simple_Task_State; Rearming : out Boolean)
+   is null;
 
    type Any_Simple_Task_State is access all Simple_Task_State'Class;
 
@@ -23,6 +30,9 @@ package TT_Patterns is
    procedure Initialize (S : in out Initial_Final_Task_State) is abstract;
    procedure Initial_Code (S : in out Initial_Final_Task_State) is abstract;
    procedure Final_Code (S : in out Initial_Final_Task_State) is abstract;
+   procedure Cancellation_Code
+     (S : in out Initial_Final_Task_State; Rearming : out Boolean)
+   is null;
 
    type Any_Initial_Final_Task_State is
      access all Initial_Final_Task_State'Class;
@@ -38,6 +48,9 @@ package TT_Patterns is
    is abstract;
    procedure Final_Code (S : in out Initial_Mandatory_Final_Task_State)
    is abstract;
+   procedure Cancellation_Code
+     (S : in out Initial_Mandatory_Final_Task_State; Rearming : out Boolean)
+   is null;
 
    type Any_Initial_Mandatory_Final_Task_State is
      access all Initial_Mandatory_Final_Task_State'Class;
@@ -54,6 +67,9 @@ package TT_Patterns is
    is abstract;
    procedure Final_Code (S : in out Initial_OptionalFinal_Task_State)
    is abstract;
+   procedure Cancellation_Code
+     (S : in out Initial_OptionalFinal_Task_State; Rearming : out Boolean)
+   is null;
 
    type Any_Initial_OptionalFinal_Task_State is
      access all Initial_OptionalFinal_Task_State'Class;
@@ -64,9 +80,8 @@ package TT_Patterns is
    --  Requires 1 slot per job  --
    -------------------------------
    task type Simple_TT_Task
-     (Work_Id     : TTS.TT_Work_Id;
-      Task_State  : Any_Simple_Task_State;
-      Synced_Init : Boolean);
+     (Work_Id    : TTS.TT_Work_Id;
+      Task_State : Any_Simple_Task_State);
 
    ---------------------------------
    --   INITIAL-FINAL TT TASK     --
@@ -75,9 +90,8 @@ package TT_Patterns is
    --  one for I, and one for F   --
    ---------------------------------
    task type Initial_Final_TT_Task
-     (Work_Id     : TTS.TT_Work_Id;
-      Task_State  : Any_Initial_Final_Task_State;
-      Synced_Init : Boolean);
+     (Work_Id    : TTS.TT_Work_Id;
+      Task_State : Any_Initial_Final_Task_State);
 
    ----------------------------------------------------
    --  INITIAL - MANDATORY (sliced) - FINAL TT TASK  --
@@ -86,9 +100,8 @@ package TT_Patterns is
    --    for I, M(s) and F parts                     --
    ----------------------------------------------------
    task type Initial_Mandatory_Final_TT_Task
-     (Work_Id     : TTS.TT_Work_Id;
-      Task_State  : Any_Initial_Mandatory_Final_Task_State;
-      Synced_Init : Boolean);
+     (Work_Id    : TTS.TT_Work_Id;
+      Task_State : Any_Initial_Mandatory_Final_Task_State);
 
    ----------------------------------------------------
    --  INITIAL and MANDATORY sliced - FINAL TT TASK  --
@@ -99,9 +112,8 @@ package TT_Patterns is
    --    the F part                                  --
    ----------------------------------------------------
    task type InitialMandatorySliced_Final_TT_Task
-     (Work_Id     : TTS.TT_Work_Id;
-      Task_State  : Any_Initial_Mandatory_Final_Task_State;
-      Synced_Init : Boolean);
+     (Work_Id    : TTS.TT_Work_Id;
+      Task_State : Any_Initial_Mandatory_Final_Task_State);
 
    ----------------------------------------------------
    --  INITIAL - [FINAL] TT TASK                     --
@@ -111,9 +123,8 @@ package TT_Patterns is
    --    slot for the final part                     --
    ----------------------------------------------------
    task type Initial_OptionalFinal_TT_Task
-     (Work_Id     : TTS.TT_Work_Id;
-      Task_State  : Any_Initial_OptionalFinal_Task_State;
-      Synced_Init : Boolean);
+     (Work_Id    : TTS.TT_Work_Id;
+      Task_State : Any_Initial_OptionalFinal_Task_State);
 
    ------------------------------------
    --  SIMPLE SYNCED ET TASK         --
@@ -134,10 +145,9 @@ package TT_Patterns is
    --  one for I, and one for F      --
    ------------------------------------
    task type Initial_Final_Synced_ET_Task
-     (Work_Id     : TTS.TT_Work_Id;
-      Task_State  : Any_Initial_Final_Task_State;
-      Synced_Init : Boolean;
-      Prio        : System.Priority)
+     (Work_Id    : TTS.TT_Work_Id;
+      Task_State : Any_Initial_Final_Task_State;
+      Prio       : System.Priority)
      with Priority => Prio;
 
    ----------------------------------------------------
@@ -148,10 +158,9 @@ package TT_Patterns is
    --    with an optional slot for the final part    --
    ----------------------------------------------------
    task type SyncedInitial_OptionalFinal_ET_Task
-     (Work_Id     : TTS.TT_Work_Id;
-      Task_State  : Any_Initial_OptionalFinal_Task_State;
-      Synced_Init : Boolean;
-      Prio        : System.Priority)
+     (Work_Id    : TTS.TT_Work_Id;
+      Task_State : Any_Initial_OptionalFinal_Task_State;
+      Prio       : System.Priority)
      with Priority => Prio;
 
 end TT_Patterns;
